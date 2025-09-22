@@ -16,15 +16,14 @@ class UserViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ['list', 'destroy', 'make_admin', 'make_user']:
             return [IsAdmin()]
-        elif self.action in ['retrieve', 'update', 'partial_update']:
-            return super().get_permissions()
+        return super().get_permissions()
 
-    def get_serializer_class(self):
+    def get_serializer_context(self):
         context = super().get_serializer_context()
         context.update({'request': self.request})
         return context
 
-    @action(methods=['post'], detail=True, permission_classes=[IsAdmin])
+    @action(detail=True, methods=['post'], permission_classes=[IsAdmin])
     def make_admin(self, request, pk=None):
         user = self.get_object()
         user.role = User.Role.ADMIN
@@ -41,12 +40,4 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def me(self, request):
         serializer = self.get_serializer(request.user)
-
         return Response(serializer.data)
-
-
-
-
-
-
-

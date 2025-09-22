@@ -16,7 +16,7 @@ class User(AbstractUser):
 
     )
     phone = models.CharField(
-        max_length=12,
+        max_length=15,
         blank=True,
         null=True,
         validators=[RegexValidator(r'^\+?\d{7,15}$', 'Напишіть номер телефону')],
