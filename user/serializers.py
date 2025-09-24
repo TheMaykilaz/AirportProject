@@ -1,45 +1,44 @@
-from urllib import request
-
 from rest_framework import serializers
 from .models import User
 
 class UserSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True)
+    password = serializers.CharField(write_only=True, required=True, min_length=8)
 
     class Meta:
         model = User
         fields = ('id', 'username', 'email', 'password', 'role', 'first_name', 'last_name', 'phone', 'created_at')
-
-        read_only_fields = ['created_at', ]
+        read_only_fields = ['created_at']
 
     def create(self, validated_data):
-        password = validated_data.pop('password', None)
-        request = self.context.get('request')
+        password = validated_data.pop('password')
+        req = self.context.get('request')
 
-        if not request or not request.user.is_authenticated or not request.user.is_staff:
+        # Залишаємо роль USER, якщо неSTAFF
+        if not req or not getattr(req.user, 'is_staff', False):
             validated_data['role'] = User.Role.USER
 
         user = User.objects.create_user(**validated_data)
-        if password:
-            user.set_password(password)
-            user.save()
+        user.set_password(password)
+        user.save()
         return user
 
     def update(self, instance, validated_data):
         password = validated_data.pop('password', None)
-        if 'role' in validated_data:
-            if not request or not request.user.is_authenticated or not request.user.is_staff:
-                validated_data.pop('role', None)
+        req = self.context.get('request')
 
-            for attr, value in validated_data.items():
-                setattr(instance, attr, value)
+        # Заборона зміни ролі для неSTAFF користувачів
+        if 'role' in validated_data and (not req or not getattr(req.user, 'is_staff', False)):
+            validated_data.pop('role')
 
-            if password:
-                instance.set_password(password)
+        # Оновлюємо інші поля
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
 
-            instance.save()
-            return instance
+        if password:
+            instance.set_password(password)
 
+        instance.save()
+        return instance
 
 
 class RegistrationSerializer(serializers.ModelSerializer):
@@ -50,7 +49,6 @@ class RegistrationSerializer(serializers.ModelSerializer):
         fields = ('id', 'username', 'email', 'password', 'first_name', 'last_name', 'phone')
 
     def create(self, validated_data):
-        # user registers as plain USER, cannot set role
         password = validated_data.pop('password')
         user = User.objects.create_user(**validated_data, password=password)
         return user

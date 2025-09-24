@@ -16,11 +16,11 @@ class User(AbstractUser):
 
     )
     phone = models.CharField(
-        max_length=12,
+        max_length=15,
         blank=True,
         null=True,
-        validators=[RegexValidator(r'^\+?\d{7,15}$', 'Напишіть номер телефону')],
-        help_text = 'Приклад +380501234567'
+        validators=[RegexValidator(r'^\+?\d{7,15}$', 'Write phone number')],
+        help_text = 'Example +380501234567'
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
