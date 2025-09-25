@@ -42,9 +42,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'user',
     'AirplaneDJ',
-    'airplane',
+    'airport',
     'rest_framework',
-    'rest_framework.simplejwt.token_blacklist',
 ]
 
 REST_FRAMEWORK = {
