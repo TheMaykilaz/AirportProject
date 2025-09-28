@@ -42,9 +42,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'user',
     'AirplaneDJ',
-    'airplane',
+    'airport',
     'rest_framework',
-    'rest_framework.simplejwt.token_blacklist',
+    'social_django',
 ]
 
 REST_FRAMEWORK = {
@@ -56,6 +56,16 @@ REST_FRAMEWORK = {
     )
 }
 
+AUTHENTICATION_BACKENDS = (
+    'social_core.backends.google.GoogleOAuth2',
+    'django.contrib.auth.backends.ModelBackend',
+)
+SOCIAL_AUTH_LOGIN_REDIRECT_URL = "/api/users/me/"
+SOCIAL_AUTH_URL_NAMESPACE = 'social'
+SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.getenv('SOCIAL_AUTH_GOOGLE_OAUTH2_KEY')
+SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv('SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET')
+
+
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
@@ -65,6 +75,8 @@ SIMPLE_JWT = {
 }
 
 AUTH_USER_MODEL = 'user.User'
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
