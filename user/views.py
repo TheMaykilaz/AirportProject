@@ -6,12 +6,11 @@ from .models import User
 from .serializers import UserSerializer
 from AirplaneDJ.permissions import IsAdmin
 from rest_framework.views import APIView
-from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
-
-from .google_auth import verify_google_token
+from requests_oauthlib import OAuth2Session
 from django.conf import settings
 from rest_framework.permissions import AllowAny
+from django.shortcuts import redirect
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -49,26 +48,57 @@ class UserViewSet(viewsets.ModelViewSet):
 
 """ GOOGLE AUTORISATION """
 
-class GoogleLoginAPIView(APIView):
+class GoogleLoginView(APIView):
     permission_classes = [AllowAny]
 
-    def post(self, request):
-        print(request.data)
-        token = request.data.get("token")
-        if not token:
-            return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+    def get(self, request):
+        google = OAuth2Session(
+            settings.GOOGLE_CLIENT_ID,
+            redirect_uri=settings.GOOGLE_REDIRECT_URI,
+            scope=["openid", "email", "profile"]
+        )
 
-        user_info = verify_google_token(token, settings.GOOGLE_CLIENT_ID)
-        if not user_info or not user_info.get("email"):
-            return Response({"error": "Invalid Google token"}, status=status.HTTP_400_BAD_REQUEST)
+        authorization_url, _ = google.authorization_url(
+            settings.GOOGLE_AUTHORIZATION_URL,
+            access_type="offline",
+            prompt="select_account"
+        )
+
+        return redirect(authorization_url)
+
+
+class GoogleCallbackView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        google = OAuth2Session(
+            settings.GOOGLE_CLIENT_ID,
+            redirect_uri=settings.GOOGLE_REDIRECT_URI
+        )
+
+        code = request.GET.get("code")
+        if not code:
+            return Response({"error": "No code provided"}, status=400)
+
+        token = google.fetch_token(
+            settings.GOOGLE_TOKEN_URL,
+            client_secret=settings.GOOGLE_CLIENT_SECRET,
+            code=code
+        )
+
+        userinfo = google.get(settings.GOOGLE_USERINFO_URL).json()
+
+        if not userinfo.get("email"):
+            return Response({"error": "No email returned"}, status=400)
 
         user, _ = User.objects.get_or_create(
-            email=user_info["email"],
+            email=userinfo["email"],
             defaults={
-                "username": user_info["email"].split("@")[0],
-                "first_name": user_info.get("given_name", ""),
-                "last_name": user_info.get("family_name", ""),
-                "role": User.Role.USER
+                "username": userinfo["email"].split("@")[0],
+                "first_name": userinfo.get("given_name", ""),
+                "last_name": userinfo.get("family_name", ""),
+                "role": User.Role.USER,
+                "google_id": userinfo.get("sub"),
             }
         )
 
@@ -80,8 +110,5 @@ class GoogleLoginAPIView(APIView):
                 "id": user.id,
                 "email": user.email,
                 "username": user.username,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "role": user.role
             }
         })

@@ -9,6 +9,7 @@ class User(AbstractUser):
         USER = 'user', 'User'
 
     email = models.EmailField(unique=True)
+    google_id = models.CharField(max_length=50, blank=True, null=True, unique=True)
 
     role = models.CharField(
         max_length=10,

@@ -20,15 +20,13 @@ def verify_google_token(id_token_str, client_id):
             client_id
         )
 
-        # Optional: verify hosted domain if needed
-        # if idinfo.get('hd') != 'yourdomain.com':
-        #     return None
+
 
         return {
             "email": idinfo.get("email"),
             "first_name": idinfo.get("given_name"),
             "last_name": idinfo.get("family_name"),
-            "google_sub": idinfo.get("sub")  # unique Google user ID
+            "google_sub": idinfo.get("sub")
         }
 
     except ValueError:
