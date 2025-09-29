@@ -14,6 +14,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from datetime import timedelta
 
+
+
 load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -44,7 +46,6 @@ INSTALLED_APPS = [
     'AirplaneDJ',
     'airport',
     'rest_framework',
-    'social_django',
 ]
 
 REST_FRAMEWORK = {
