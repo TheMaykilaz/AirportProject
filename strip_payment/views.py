@@ -1,8 +1,9 @@
 import stripe
 from django.conf import settings
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from drf_spectacular.utils import extend_schema, OpenApiExample
@@ -11,7 +12,7 @@ from airport.models import Order
 from airport.models import Payment
 from .serializers import PaymentSerializer
 from AirplaneDJ.permissions import IsAdmin, IsSelfOrAdmin, ReadOnly
-from AirplaneDJ.settings import STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+from AirplaneDJ.settings import STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PUBLISHABLE_KEY
 
 stripe.api_key = STRIPE_SECRET_KEY
 endpoint_secret = STRIPE_WEBHOOK_SECRET
@@ -68,9 +69,10 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
 
 # Stripe webhook
-
-@permission_classes([AllowAny])
+@csrf_exempt
+@csrf_exempt
 @api_view(["POST"])
+@permission_classes([AllowAny])
 def stripe_webhook(request):
     payload = request.body
     sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
@@ -99,3 +101,15 @@ def stripe_webhook(request):
             pass
 
     return Response(status=200)
+
+
+# Test checkout page (Stripe.js)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def test_checkout(request):
+    client_secret = request.GET.get("client_secret", "")
+    context = {
+        "stripe_publishable_key": STRIPE_PUBLISHABLE_KEY,
+        "client_secret": client_secret,
+    }
+    return render(request, "stripe_test.html", context)

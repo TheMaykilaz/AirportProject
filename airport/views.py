@@ -1,5 +1,6 @@
 
 from rest_framework import viewsets, status
+from decimal import Decimal, InvalidOperation
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -215,7 +216,7 @@ class TestOrderViewSet(viewsets.ViewSet):
 
         flight = serializer.validated_data['flight_id']
         seat_numbers = serializer.validated_data.get('seat_numbers', [])
-        user = request.user if request.user.is_authenticated else None
+        user = serializer.validated_data.get('user_id') or (request.user if request.user.is_authenticated else None)
 
         with transaction.atomic():
             order = Order.objects.create(
@@ -288,6 +289,14 @@ class TestOrderViewSet(viewsets.ViewSet):
     def create_payment_intent(self, request, pk=None):
         order = get_object_or_404(Order, pk=pk)
         payment = order.payment
+        # Optional amount override (for testing)
+        override_amount = request.data.get("amount")
+        if override_amount is not None:
+            try:
+                payment.amount = Decimal(str(override_amount))
+                payment.save(update_fields=["amount"])
+            except (InvalidOperation, ValueError):
+                return Response({"error": "Invalid amount format"}, status=status.HTTP_400_BAD_REQUEST)
         intent = payment.create_stripe_payment_intent()
         return Response({
             "stripe_client_secret": intent["client_secret"],
