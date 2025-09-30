@@ -8,6 +8,8 @@ class User(AbstractUser):
         ADMIN = 'admin', 'Admin'
         USER = 'user', 'User'
 
+    email = models.EmailField(unique=True)
+    google_id = models.CharField(max_length=50, blank=True, null=True, unique=True)
 
     role = models.CharField(
         max_length=10,
@@ -29,6 +31,11 @@ class User(AbstractUser):
 
     def __str__(self):
         return f"{self.username} -  ({self.role})"
+
+
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = []
+
 
     @property
     def is_admin(self):
