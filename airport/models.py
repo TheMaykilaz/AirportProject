@@ -277,12 +277,7 @@ class TicketManager(models.Manager):
                 created_tickets.append(ticket)
 
             order.total_price = total_price
-            order.mark_confirmed()
-
-            FlightSeat.objects.filter(
-                flight=flight,
-                seat_number__in=seat_numbers
-            ).update(seat_status=FlightSeat.SeatStatus.BOOKED)
+            # Order remains in PROCESSING until payment succeeds
 
         return created_tickets
 
@@ -332,61 +327,68 @@ class Ticket(TimeStampedModel):
     def __str__(self):
         return f"Ticket {self.id} for {self.order.user} - {self.seat} ({self.status})"
 
-'''
-class Payment(models.Model):
-    class PaymentStatus(models.TextChoices):
-        PENDING = "pending", "Pending"
-        SUCCESS = "success", "Success"
-        FAILED = "failed", "Failed"
-        REFUNDED = "refunded", "Refunded"
+class PaymentStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    SUCCEEDED = "succeeded", "Succeeded"
+    FAILED = "failed", "Failed"
 
-    order = models.OneToOneField(Order, on_delete=models.PROTECT, related_name="payment")
-    provider = models.CharField(max_length=50, help_text="e.g. stripe, paypal, liqpay")
-    amount = models.DecimalField(max_digits=12, decimal_places=2)
-    currency = models.CharField(max_length=3, default="USD")
+class Payment(models.Model):
+    order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name="payment")
+    stripe_payment_intent_id = models.CharField(max_length=255, blank=True, null=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     status = models.CharField(max_length=20, choices=PaymentStatus.choices, default=PaymentStatus.PENDING)
-    transaction_id = models.CharField(max_length=100, blank=True, null=True, help_text="ID from provider")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
-        indexes = [
-            models.Index(fields=["order"]),
-            models.Index(fields=["status"]),
-            models.Index(fields=["transaction_id"]),
-        ]
+    def create_stripe_payment_intent(self, currency="usd"):
+        try:
+            import stripe
+            from AirplaneDJ.settings import STRIPE_SECRET_KEY
+        except Exception:
+            stripe = None
+            STRIPE_SECRET_KEY = None
 
-    def __str__(self):
-        return f"Payment {self.id} for Order {self.order.id} - {self.status}"
+        if stripe is None or not STRIPE_SECRET_KEY:
+            raise RuntimeError("Stripe not configured")
 
-    def mark_success(self, tx_id: str):
-        with transaction.atomic():
-            self.status = self.PaymentStatus.SUCCESS
-            self.transaction_id = tx_id
-            self.save(update_fields=["status", "transaction_id", "updated_at"])
+        stripe.api_key = STRIPE_SECRET_KEY
 
-            self.order.mark_confirmed()
+
+        try:
+            amount_int = int(float(self.amount) * 100)
+        except Exception:
+            raise ValueError("Invalid amount for Stripe PaymentIntent")
+
+        if amount_int < 50:  # для USD мінімум 50 cents
+            raise ValueError("Amount too small for Stripe PaymentIntent")
+
+        try:
+            intent = stripe.PaymentIntent.create(
+                amount=amount_int,
+                currency=currency,
+                metadata={"order_id": str(self.order.id)},
+                payment_method_types=["card"],
+            )
+        except stripe.error.InvalidRequestError as e:
+            raise ValueError(f"Stripe error: {str(e)}")
+
+        self.stripe_payment_intent_id = intent["id"]
+        self.save(update_fields=["stripe_payment_intent_id"])
+        return intent
+
+    def mark_succeeded(self):
+        self.status = PaymentStatus.SUCCEEDED
+        self.save(update_fields=["status"])
+        # On success, finalize order and seats
+        from django.utils import timezone
+        Ticket.objects.filter(order=self.order).update(status=TicketStatus.BOOKED)
+        FlightSeat.objects.filter(
+            id__in=Ticket.objects.filter(order=self.order).values_list("seat_id", flat=True)
+        ).update(seat_status=FlightSeat.SeatStatus.BOOKED, locked_at=timezone.now())
+        self.order.mark_confirmed()
 
     def mark_failed(self):
-        with transaction.atomic():
-            self.status = self.PaymentStatus.FAILED
-            self.save(update_fields=["status", "updated_at"])
-
-            self.order.mark_failed()
-
-            FlightSeat.objects.filter(
-                tickets__order=self.order
-            ).update(
-                seat_status=FlightSeat.SeatStatus.AVAILABLE,
-                locked_at=None
-            )
-
-            self.order.tickets.update(status=TicketStatus.CANCELLED)
-
-    def mark_refunded(self):
-        with transaction.atomic():
-            self.status = self.PaymentStatus.REFUNDED
-            self.save(update_fields=["status", "updated_at"])
-
-            self.order.cancel("Payment refunded")
-'''
+        self.status = PaymentStatus.FAILED
+        self.save(update_fields=["status"])
+        # Release seats and fail order
+        self.order.fail_and_release()
