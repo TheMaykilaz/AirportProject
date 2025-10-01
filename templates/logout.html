@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Logout</title>
+    <style>
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 2rem; }
+        .row { margin: .75rem 0; }
+        .btn { padding: 10px 16px; border-radius: 8px; border: none; background: #b3261e; color: #fff; cursor: pointer; text-decoration: none; }
+        pre { background: #f6f8fa; padding: 12px; border-radius: 6px; overflow-x: auto; }
+        .muted { color: #666; font-size: .9rem; }
+    </style>
+</head>
+<body>
+<h2>Logout</h2>
+<div class="row muted">This clears locally stored JWTs and optionally revokes the refresh token via the API.</div>
+
+<div class="row" id="status"></div>
+<div class="row" id="result"><pre>// Running automatic logout...</pre></div>
+
+<div class="row">
+  <button class="btn" id="clearLocal">Clear local tokens</button>
+  <button class="btn" id="revokeRefresh">Revoke refresh token via API</button>
+  <a class="btn" href="/auth/test/">Back to Auth Test</a>
+</div>
+
+<script>
+  const resultEl = document.getElementById('result');
+  const statusEl = document.getElementById('status');
+  const log = (obj) => { resultEl.innerHTML = '<pre>' + JSON.stringify(obj, null, 2) + '</pre>'; };
+
+  function getTokens() {
+    try {
+      const raw = localStorage.getItem('auth_tokens');
+      if (!raw) return { access: '', refresh: '' };
+      return JSON.parse(raw);
+    } catch (e) {
+      return { access: '', refresh: '' };
+    }
+  }
+
+  function clearAllClientTokens() {
+    try { localStorage.removeItem('auth_tokens'); } catch (e) {}
+    try { sessionStorage.removeItem('auth_tokens'); } catch (e) {}
+
+    // Best-effort cookie clearing (path=/). Adjust names if you later store tokens in cookies.
+    document.cookie.split(';').forEach(function(c) {
+      const eqPos = c.indexOf('=');
+      const name = eqPos > -1 ? c.substr(0, eqPos).trim() : c.trim();
+      if (!name) return;
+      document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+    });
+  }
+
+  document.getElementById('clearLocal').onclick = () => {
+    clearAllClientTokens();
+    try { localStorage.removeItem('callback_user'); } catch (e) {}
+    statusEl.textContent = 'Local/session storage and cookies cleared';
+    log({ cleared_local: true });
+  };
+
+  document.getElementById('revokeRefresh').onclick = async () => {
+    const { refresh } = getTokens();
+    if (!refresh) { statusEl.textContent = 'No refresh token found'; return; }
+    try {
+      const res = await fetch('/api/users/auth/logout/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh })
+      });
+      const data = await res.json().catch(() => ({}));
+      statusEl.textContent = 'Logout endpoint called';
+      log({ status: res.status, data });
+    } catch (e) { log({ error: String(e) }); }
+  };
+
+  // Automatic flow on page load: revoke if refresh present, then clear client tokens, then redirect
+  (async function autoLogout() {
+    const { refresh } = getTokens();
+    if (refresh) {
+      try {
+        await fetch('/api/users/auth/logout/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh })
+        });
+      } catch (e) {}
+    }
+    clearAllClientTokens();
+    try { localStorage.removeItem('callback_user'); } catch (e) {}
+    statusEl.textContent = 'Logged out';
+    setTimeout(() => {
+      window.location.href = '/auth/test/';
+    }, 500);
+  })();
+</script>
+</body>
+</html>
+
+
