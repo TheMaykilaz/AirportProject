@@ -34,7 +34,7 @@ class Payment(TimeStampedModel):
         stripe.api_key = settings.STRIPE_SECRET_KEY
 
         intent = stripe.PaymentIntent.create(
-            amount=int(self.amount * 100),  # Stripe працює в центрах
+            amount=int(self.amount * 100),  # Stripe works in cents
             currency=self.currency,
             metadata={"order_id": str(self.order.id)},
         )
