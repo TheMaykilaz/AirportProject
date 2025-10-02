@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Google Callback</title>
+    <style>
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 2rem; }
+        .row { margin: .75rem 0; }
+        .btn { padding: 10px 16px; border-radius: 8px; border: none; background: #0b57d0; color: #fff; cursor: pointer; text-decoration: none; }
+        pre { background: #f6f8fa; padding: 12px; border-radius: 6px; overflow-x: auto; }
+        .muted { color: #666; font-size: .9rem; }
+    </style>
+</head>
+<body>
+<h2>Google OAuth Callback</h2>
+<div class="row muted">This page captures tokens returned from the backend and saves them to your browser for testing.</div>
+
+<div class="row" id="status"></div>
+<div class="row" id="result"><pre>// Waiting for tokens...</pre></div>
+<div class="row">
+  <a class="btn" href="/auth/test/">Go to Auth Test</a>
+  <a class="btn" href="/logout/">Logout</a>
+  <a class="btn" id="rawLink" target="_blank">View raw JSON</a>
+  </div>
+
+<script>
+  const statusEl = document.getElementById('status');
+  const resultEl = document.getElementById('result');
+  const log = (obj) => { resultEl.innerHTML = '<pre>' + JSON.stringify(obj, null, 2) + '</pre>'; };
+
+  async function fetchTokensFromBackend() {
+    try {
+      // Re-hit the current URL but accept JSON explicitly, expecting backend to return JSON
+      const url = new URL(window.location.href);
+      url.searchParams.set('format', 'json');
+      const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        const text = await res.text();
+        throw new Error(text.slice(0, 200));
+      }
+      if (data && (data.access || data.refresh)) {
+        const tokens = { access: data.access || '', refresh: data.refresh || '' };
+        localStorage.setItem('auth_tokens', JSON.stringify(tokens));
+        if (data.user) {
+          localStorage.setItem('callback_user', JSON.stringify(data.user));
+        }
+        statusEl.textContent = 'Tokens saved to localStorage as auth_tokens';
+        document.getElementById('rawLink').href = window.location.href;
+        log({ status: res.status, data });
+        // Auto-redirect to test page after saving tokens
+        setTimeout(() => { window.location.href = '/auth/test/'; }, 600);
+      } else {
+        statusEl.textContent = 'No tokens found in response';
+        log({ status: res.status, data });
+      }
+    } catch (e) {
+      statusEl.textContent = 'Failed to fetch tokens';
+      log({ error: String(e) });
+    }
+  }
+
+  fetchTokensFromBackend();
+</script>
+</body>
+</html>
+
+

@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from .models import User
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework import serializers as drf_serializers
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -81,3 +83,31 @@ class RegistrationSerializer(serializers.ModelSerializer):
         password = validated_data.pop("password")
         user = User.objects.create_user(**validated_data, password=password)
         return user
+
+
+class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
+    username_field = User.EMAIL_FIELD
+
+    def validate(self, attrs):
+        # Map email field to expected username key
+        email = attrs.get('email') or attrs.get('username')
+        if not email:
+            raise drf_serializers.ValidationError({'email': ['This field is required.']})
+        attrs['username'] = email
+        return super().validate(attrs)
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, min_length=8)
+
+
+class EmailLoginRequestSerializer(serializers.Serializer):
+    """Serializer for requesting a verification code via email."""
+    email = serializers.EmailField(required=True)
+
+
+class EmailLoginVerifySerializer(serializers.Serializer):
+    """Serializer for verifying the email code and logging in."""
+    email = serializers.EmailField(required=True)
+    code = serializers.CharField(required=True, min_length=6, max_length=6)

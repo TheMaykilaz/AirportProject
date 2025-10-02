@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Auth Test - Google & Future Providers</title>
+    <style>
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 2rem; }
+        .row { margin: .75rem 0; }
+        .btn { padding: 10px 16px; border-radius: 8px; border: none; background: #0b57d0; color: #fff; cursor: pointer; }
+        .btn.secondary { background: #444; }
+        input, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 8px; }
+        pre { background: #f6f8fa; padding: 12px; border-radius: 6px; overflow-x: auto; }
+        .muted { color: #666; font-size: .9rem; }
+        .providers { display: flex; gap: .5rem; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+<h2>Authentication Test</h2>
+
+<div class="row muted">Use this page to test Google OAuth2 and JWT issuance. Designed to be extended with Facebook, Email, etc.</div>
+
+<h3>Email-Based Login (Passwordless)</h3>
+<div class="row">
+  <label>Email Address</label>
+  <input id="emailInput" type="email" placeholder="your@email.com" />
+</div>
+<div class="row">
+  <button class="btn" id="requestCodeBtn">Send Verification Code</button>
+</div>
+<div class="row" id="codeSection" style="display: none;">
+  <label>Verification Code (6 digits)</label>
+  <input id="codeInput" type="text" placeholder="123456" maxlength="6" />
+</div>
+<div class="row" id="verifySection" style="display: none;">
+  <button class="btn" id="verifyCodeBtn">Verify & Login</button>
+</div>
+
+<h3>Google OAuth2 Flow (Server-initiated)</h3>
+<div class="row providers">
+  <a class="btn" href="/api/users/auth/google/login/">Continue with Google</a>
+  <a class="btn" href="/api/users/auth/google/login/?force=1">Change Google account (force select)</a>
+    <button class="btn secondary" id="meBtn">Call /api/users/users/me (JWT required)</button>
+    <button class="btn secondary" id="logoutBtn">Clear stored tokens</button>
+  <a class="btn" href="/logout/">Logout page</a>
+  </div>
+
+<div class="row">
+  <div class="muted">After Google redirects back to /api/auth/google/callback/, the API returns JSON with refresh/access. Paste below to simulate or let the script read from the URL if present.</div>
+</div>
+
+<h3>Manual Token Test</h3>
+<div class="row">
+  <label>Access Token (JWT)</label>
+  <input id="accessToken" placeholder="Paste access token here" />
+</div>
+<div class="row">
+  <label>Refresh Token (JWT)</label>
+  <input id="refreshToken" placeholder="Paste refresh token here" />
+</div>
+
+<div class="row">
+  <button class="btn" id="saveTokens">Save tokens</button>
+  <button class="btn secondary" id="refreshAccess">Refresh access via /api/token/refresh/</button>
+  <button class="btn secondary" id="obtainPair">Obtain pair via /api/token/ (email/password)</button>
+  <span class="muted">(optional if you have local credentials)</span>
+}</div>
+
+<div class="row">
+  <label>Result</label>
+  <div id="result"><pre>// Results will appear here</pre></div>
+  </div>
+
+<script>
+  const result = document.getElementById('result');
+  const log = (obj) => { result.innerHTML = '<pre>' + JSON.stringify(obj, null, 2) + '</pre>'; };
+
+  const accessEl = document.getElementById('accessToken');
+  const refreshEl = document.getElementById('refreshToken');
+  const currentUserBox = document.createElement('div');
+  currentUserBox.className = 'row muted';
+  document.body.insertBefore(currentUserBox, result.parentElement);
+
+  const saveLocal = () => {
+    const tokens = { access: accessEl.value || '', refresh: refreshEl.value || '' };
+    localStorage.setItem('auth_tokens', JSON.stringify(tokens));
+    log({ saved: true, tokens });
+  };
+
+  const loadLocal = () => {
+    try {
+      const raw = localStorage.getItem('auth_tokens');
+      if (!raw) {
+        accessEl.value = '';
+        refreshEl.value = '';
+        return;
+      }
+      const tokens = JSON.parse(raw);
+      accessEl.value = tokens.access || '';
+      refreshEl.value = tokens.refresh || '';
+    } catch (e) {}
+
+    // Show current user from callback if present
+    try {
+      const u = localStorage.getItem('callback_user');
+      if (u) {
+        const user = JSON.parse(u);
+        currentUserBox.innerHTML = '<b>Current callback user:</b> ' + JSON.stringify(user);
+      } else {
+        currentUserBox.innerHTML = '<b>Current callback user:</b> (none)';
+      }
+    } catch (e) { currentUserBox.innerHTML = '<b>Current callback user:</b> (error)'; }
+  };
+
+  const clearLocal = () => {
+    localStorage.removeItem('auth_tokens');
+    localStorage.removeItem('callback_user');
+    accessEl.value = '';
+    refreshEl.value = '';
+    log({ cleared: true });
+  };
+
+  const tryParseCallbackJson = async () => {
+    // If current page is loaded as the callback response (JSON), fetch and store
+    // This page is static; we allow users to paste the tokens. Kept helper for completeness.
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('access') && params.get('refresh')) {
+      accessEl.value = params.get('access');
+      refreshEl.value = params.get('refresh');
+      saveLocal();
+    }
+  };
+
+  document.getElementById('saveTokens').onclick = saveLocal;
+  document.getElementById('logoutBtn').onclick = clearLocal;
+  document.getElementById('meBtn').onclick = async () => {
+    try {
+      // First, prefer the stored callback user as the "me" result if present
+      const callbackUser = localStorage.getItem('callback_user');
+      if (callbackUser) {
+        const parsed = JSON.parse(callbackUser);
+        log({ status: 200, from: 'callback_user', data: parsed });
+        return;
+      }
+
+      // Fallback to API call using JWT if present
+      let token = '';
+      try {
+        const raw = localStorage.getItem('auth_tokens');
+        if (raw) token = (JSON.parse(raw).access) || '';
+      } catch (e) {}
+      const res = await fetch('/api/users/users/me/', {
+        headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+      });
+      const data = await res.json();
+      log({ status: res.status, from: 'api', data });
+    } catch (e) { log({ error: String(e) }); }
+  };
+
+  document.getElementById('refreshAccess').onclick = async () => {
+    try {
+      const res = await fetch('/api/token/refresh/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh: refreshEl.value })
+      });
+      const data = await res.json();
+      if (data.access) { accessEl.value = data.access; saveLocal(); }
+      log({ status: res.status, data });
+    } catch (e) { log({ error: String(e) }); }
+  };
+
+  // Google revoke helpers
+  const googleRevoke = async () => {
+    try {
+      const res = await fetch('/api/users/auth/google/revoke/', { method: 'POST' });
+      const data = await res.json();
+      log({ google_revoke: data });
+    } catch (e) { log({ error: String(e) }); }
+  };
+
+  // Expose simple revoke button
+  const revokeBtn = document.createElement('button');
+  revokeBtn.className = 'btn secondary';
+  revokeBtn.textContent = 'Revoke Google token (if stored)';
+  revokeBtn.onclick = googleRevoke;
+  document.querySelector('.providers').appendChild(revokeBtn);
+
+  document.getElementById('obtainPair').onclick = async () => {
+    const email = prompt('email:');
+    const password = prompt('password:');
+    if (!email || !password) return;
+    try {
+      const res = await fetch('/api/token/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (data.access) accessEl.value = data.access;
+      if (data.refresh) refreshEl.value = data.refresh;
+      saveLocal();
+      log({ status: res.status, data });
+    } catch (e) { log({ error: String(e) }); }
+  };
+
+  loadLocal();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) loadLocal(); });
+  tryParseCallbackJson();
+
+  // Email-based authentication handlers
+  const emailInput = document.getElementById('emailInput');
+  const codeInput = document.getElementById('codeInput');
+  const requestCodeBtn = document.getElementById('requestCodeBtn');
+  const verifyCodeBtn = document.getElementById('verifyCodeBtn');
+  const codeSection = document.getElementById('codeSection');
+  const verifySection = document.getElementById('verifySection');
+
+  requestCodeBtn.onclick = async () => {
+    const email = emailInput.value.trim();
+    if (!email) {
+      log({ error: 'Please enter an email address' });
+      return;
+    }
+    
+    requestCodeBtn.disabled = true;
+    requestCodeBtn.textContent = 'Sending...';
+    
+    try {
+      const res = await fetch('/api/users/auth/email/request/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      
+      if (res.ok) {
+        log({ status: res.status, data });
+        codeSection.style.display = 'block';
+        verifySection.style.display = 'block';
+        codeInput.focus();
+        requestCodeBtn.textContent = 'Code Sent! ✓';
+        setTimeout(() => {
+          requestCodeBtn.textContent = 'Send Verification Code';
+          requestCodeBtn.disabled = false;
+        }, 3000);
+      } else {
+        log({ status: res.status, error: data });
+        requestCodeBtn.textContent = 'Send Verification Code';
+        requestCodeBtn.disabled = false;
+      }
+    } catch (e) {
+      log({ error: String(e) });
+      requestCodeBtn.textContent = 'Send Verification Code';
+      requestCodeBtn.disabled = false;
+    }
+  };
+
+  verifyCodeBtn.onclick = async () => {
+    const email = emailInput.value.trim();
+    const code = codeInput.value.trim();
+    
+    if (!email || !code) {
+      log({ error: 'Please enter both email and verification code' });
+      return;
+    }
+    
+    verifyCodeBtn.disabled = true;
+    verifyCodeBtn.textContent = 'Verifying...';
+    
+    try {
+      const res = await fetch('/api/users/auth/email/verify/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code })
+      });
+      const data = await res.json();
+      
+      if (res.ok && data.access && data.refresh) {
+        // Save tokens
+        const tokens = { access: data.access, refresh: data.refresh };
+        localStorage.setItem('auth_tokens', JSON.stringify(tokens));
+        if (data.user) {
+          localStorage.setItem('callback_user', JSON.stringify(data.user));
+        }
+        accessEl.value = data.access;
+        refreshEl.value = data.refresh;
+        log({ status: res.status, data });
+        verifyCodeBtn.textContent = 'Login Successful! ✓';
+        
+        // Clear inputs
+        emailInput.value = '';
+        codeInput.value = '';
+        
+        // Reload to show current user
+        setTimeout(() => {
+          loadLocal();
+          verifyCodeBtn.textContent = 'Verify & Login';
+          verifyCodeBtn.disabled = false;
+          codeSection.style.display = 'none';
+          verifySection.style.display = 'none';
+        }, 2000);
+      } else {
+        log({ status: res.status, error: data });
+        verifyCodeBtn.textContent = 'Verify & Login';
+        verifyCodeBtn.disabled = false;
+      }
+    } catch (e) {
+      log({ error: String(e) });
+      verifyCodeBtn.textContent = 'Verify & Login';
+      verifyCodeBtn.disabled = false;
+    }
+  };
+
+  // Allow Enter key to submit
+  emailInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') requestCodeBtn.click();
+  });
+  codeInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') verifyCodeBtn.click();
+  });
+</script>
+</body>
+</html>
+
+

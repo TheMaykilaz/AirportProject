@@ -1,10 +1,13 @@
 
 from rest_framework import viewsets, status
+from decimal import Decimal, InvalidOperation
+from django.shortcuts import get_object_or_404
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.core.exceptions import ValidationError
 from django.db import transaction
-
+import stripe
+from user.models import User
 from .models import (
     Country,
     Airport,
@@ -13,10 +16,10 @@ from .models import (
     Flight,
     FlightSeat,
     Ticket,
-    Order,
     TicketStatus,
     Order,
-    OrderStatus
+    OrderStatus,
+    Payment
 )
 from .serializers import (
     CountrySerializer,
@@ -26,9 +29,14 @@ from .serializers import (
     FlightSerializer,
     FlightSeatSerializer,
     TicketSerializer,
+    PaymentSerializer,
+    OrderPaymentCreateSerializer
 )
+from drf_spectacular.utils import extend_schema, OpenApiExample
 from AirplaneDJ.permissions import IsAdmin, IsSelfOrAdmin, ReadOnly
+from AirplaneDJ.settings import STRIPE_SECRET_KEY
 
+stripe.api_key = STRIPE_SECRET_KEY
 class CountryViewSet(viewsets.ModelViewSet):
     queryset = Country.objects.all()
     serializer_class = CountrySerializer
@@ -180,51 +188,118 @@ class TicketViewSet(viewsets.ModelViewSet):
 
 
 class TestOrderViewSet(viewsets.ViewSet):
-    @action(detail=False, methods=["post"])
+    def get_serializer_class(self):
+        if self.action == "create_order":
+            return OrderPaymentCreateSerializer
+        return PaymentSerializer
+
+    @extend_schema(
+        request=OrderPaymentCreateSerializer,
+        responses={201: PaymentSerializer},
+        examples=[
+            OpenApiExample(
+                "Create order with seat numbers",
+                value={
+                    "flight_id": 1,
+                    "seat_numbers": ["12A", "12B"]
+                },
+            )
+        ]
+    )
+    @action(detail=False, methods=["post"], url_path="create_order")
     def create_order(self, request):
-        user = request.user if request.user.is_authenticated else None
-        flight_id = request.data.get("flight_id")
-        seat_numbers = request.data.get("seat_numbers", [])
-
-        if not flight_id:
-            return Response({"error": "flight_id is required"}, status=400)
-
-        try:
-            flight = Flight.objects.get(id=flight_id)
-        except Flight.DoesNotExist:
-            return Response({"error": "Flight not found"}, status=404)
-
-        # Створюємо Order
-        order = Order.objects.create(
-            user=user,
-            flight=flight,
-            status=OrderStatus.PROCESSING,
-            total_price=0
+        serializer = OrderPaymentCreateSerializer(
+            data=request.data,
+            context={'request': request}
         )
+        serializer.is_valid(raise_exception=True)
 
-        # Бронюємо квитки через TicketManager
-        try:
-            tickets = Ticket.objects.book_tickets(order, seat_numbers)
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=400)
+        flight = serializer.validated_data['flight_id']
+        seat_numbers = serializer.validated_data.get('seat_numbers', [])
+        user = serializer.validated_data.get('user_id') or (request.user if request.user.is_authenticated else None)
 
-        serializer = TicketSerializer(tickets, many=True)
+        with transaction.atomic():
+            order = Order.objects.create(
+                user=user,
+                flight=flight,
+                status=OrderStatus.PROCESSING,
+                total_price=0
+            )
+
+            try:
+                tickets = Ticket.objects.book_tickets(order, seat_numbers)
+            except ValidationError as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+            payment, created = Payment.objects.get_or_create(
+                order=order,
+                defaults={"amount": order.total_price}
+            )
+            if not created:
+                payment.amount = order.total_price
+                payment.save(update_fields=["amount"])
+
+            try:
+                intent = payment.create_stripe_payment_intent()
+            except RuntimeError as e:
+                return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        payment_serializer = PaymentSerializer(payment)
+
         return Response({
             "order_id": order.id,
-            "tickets": serializer.data
-        }, status=201)
+            "tickets": [t.id for t in tickets],
+            "stripe_client_secret": intent.get("client_secret"),
+            "payment": payment_serializer.data
+        }, status=status.HTTP_201_CREATED)
 
-    @action(detail=False, methods=["get"])
-    def test_order(self, request):
-        orders = Order.objects.all()[:5]
-        data = []
-        for o in orders:
-            data.append({
-                "order_id": o.id,
-                "user": str(o.user),
-                "flight": str(o.flight),
-                "status": o.status,
-                "total_price": o.total_price,
-                "tickets": [str(t) for t in o.tickets.all()]
-            })
-        return Response(data)
+    @action(detail=True, methods=["post"], url_path="confirm_payment")
+    def confirm_payment(self, request, pk=None):
+        order = get_object_or_404(Order, pk=pk)
+        payment = order.payment
+        payment.mark_succeeded()
+        return Response({
+            "order_status": order.status,
+            "payment_status": payment.status
+        })
+
+    @action(detail=True, methods=["post"], url_path="cancel_order")
+    def cancel_order(self, request, pk=None):
+        order = get_object_or_404(Order, pk=pk)
+        order.cancel(reason="Test cancel")
+        return Response({
+            "order_status": order.status,
+            "tickets": [{"seat": t.seat.seat_number, "status": t.status} for t in order.tickets.all()]
+        })
+
+    @action(detail=True, methods=["get"], url_path="status")
+    def status(self, request, pk=None):
+        order = get_object_or_404(Order, pk=pk)
+        payment = order.payment
+        return Response({
+            "order_id": order.id,
+            "order_status": order.status,
+            "payment_status": payment.status,
+            "tickets": [{"seat": t.seat.seat_number, "status": t.status, "price": str(t.price)} for t in order.tickets.all()]
+        })
+
+    @action(detail=True, methods=["post"], url_path="create_payment_intent")
+    def create_payment_intent(self, request, pk=None):
+        order = get_object_or_404(Order, pk=pk)
+        payment = order.payment
+        # Optional amount override (for testing)
+        override_amount = request.data.get("amount")
+        if override_amount is not None:
+            try:
+                payment.amount = Decimal(str(override_amount))
+                payment.save(update_fields=["amount"])
+            except (InvalidOperation, ValueError):
+                return Response({"error": "Invalid amount format"}, status=status.HTTP_400_BAD_REQUEST)
+        intent = payment.create_stripe_payment_intent()
+        return Response({
+            "stripe_client_secret": intent["client_secret"],
+            "payment_id": payment.id,
+            "payment_status": payment.status
+        })

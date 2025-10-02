@@ -13,7 +13,9 @@ from .models import (
     FlightSeat,
     Ticket,
     TicketStatus,
-    TicketManager
+    TicketManager,
+    Payment,
+    PaymentStatus
 )
 
 User = get_user_model()
@@ -209,3 +211,15 @@ class TicketSerializer(serializers.ModelSerializer):
         except DjangoValidationError as e:
             raise serializers.ValidationError(e.message_dict if hasattr(e, "message_dict") else str(e))
 
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = ["id", "order", "amount", "status", "stripe_payment_intent_id", "created_at", "updated_at"]
+        read_only_fields = ["status", "stripe_payment_intent_id", "created_at", "updated_at"]
+
+class OrderPaymentCreateSerializer(serializers.Serializer):
+    user_id = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=False)
+    flight_id = serializers.PrimaryKeyRelatedField(queryset=Flight.objects.all())
+    seat_numbers = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
