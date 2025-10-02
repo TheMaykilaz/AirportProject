@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: airport_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=airportdb
+      - POSTGRES_USER=airportuser
+      - POSTGRES_PASSWORD=airportpass123
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airportuser -d airportdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    container_name: airport_web
+    command: gunicorn AirplaneDJ.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles
+    ports:
+      - "8000:8000"
+    environment:
+      - SECRET_KEY=django-insecure-docker-dev-key-change-in-production-12345
+      - DEBUG=True
+      - DB_NAME=airportdb
+      - DB_USER=airportuser
+      - DB_PASSWORD=airportpass123
+      - DB_HOST=db
+      - DB_PORT=5432
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-sk_test_placeholder}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY:-pk_test_placeholder}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:8000/api/auth/google/callback/}
+      - GOOGLE_TOKEN_URL=${GOOGLE_TOKEN_URL:-https://oauth2.googleapis.com/token}
+      - GOOGLE_AUTHORIZATION_URL=${GOOGLE_AUTHORIZATION_URL:-https://accounts.google.com/o/oauth2/v2/auth}
+      - GOOGLE_USERINFO_URL=${GOOGLE_USERINFO_URL:-https://www.googleapis.com/oauth2/v2/userinfo}
+      - EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
+      - EMAIL_HOST=smtp.gmail.com
+      - EMAIL_PORT=587
+      - EMAIL_USE_TLS=True
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER:-}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-}
+      - DEFAULT_FROM_EMAIL=noreply@airplanedj.com
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  static_volume:
