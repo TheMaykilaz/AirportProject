@@ -218,7 +218,7 @@ class PaymentSerializer(serializers.ModelSerializer):
         read_only_fields = ["status", "stripe_payment_intent_id", "created_at", "updated_at"]
 
 class OrderPaymentCreateSerializer(serializers.Serializer):
-    user_id = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=False)
+    user_id = serializers.IntegerField()
     flight_id = serializers.PrimaryKeyRelatedField(queryset=Flight.objects.all())
     seat_numbers = serializers.ListField(
         child=serializers.CharField(), required=False, allow_empty=True
