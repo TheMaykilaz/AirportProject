@@ -142,28 +142,49 @@ def stripe_webhook(request):
 
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
-    except ValueError:
-        return Response(status=400)
-    except stripe.error.SignatureVerificationError:
-        return Response(status=400)
+    except ValueError as e:
+        print(f"❌ Webhook error: Invalid payload - {e}")
+        return Response({"error": "Invalid payload"}, status=400)
+    except stripe.error.SignatureVerificationError as e:
+        print(f"❌ Webhook error: Invalid signature - {e}")
+        return Response({"error": "Invalid signature"}, status=400)
 
-    if event["type"] == "payment_intent.succeeded":
+    event_type = event["type"]
+    print(f"✅ Received webhook: {event_type}")
+
+    if event_type == "checkout.session.completed":
+        session = event["data"]["object"]
+        payment_intent_id = session.get("payment_intent")
+        
+        if payment_intent_id:
+            try:
+                payment = Payment.objects.get(stripe_payment_intent_id=payment_intent_id)
+                payment.mark_succeeded()
+                print(f"✅ Payment {payment.id} marked as succeeded (Order #{payment.order.id})")
+            except Payment.DoesNotExist:
+                print(f"⚠️ Payment not found for intent: {payment_intent_id}")
+        else:
+            print(f"⚠️ No payment_intent in session: {session.get('id')}")
+
+    elif event_type == "payment_intent.succeeded":
         intent = event["data"]["object"]
         try:
             payment = Payment.objects.get(stripe_payment_intent_id=intent["id"])
             payment.mark_succeeded()
+            print(f"✅ Payment {payment.id} marked as succeeded")
         except Payment.DoesNotExist:
-            pass
+            print(f"⚠️ Payment not found for intent: {intent['id']}")
 
-    elif event["type"] == "payment_intent.payment_failed":
+    elif event_type == "payment_intent.payment_failed":
         intent = event["data"]["object"]
         try:
             payment = Payment.objects.get(stripe_payment_intent_id=intent["id"])
             payment.mark_failed()
+            print(f"❌ Payment {payment.id} marked as failed")
         except Payment.DoesNotExist:
-            pass
+            print(f"⚠️ Payment not found for intent: {intent['id']}")
 
-    return Response(status=200)
+    return Response({"status": "success"}, status=200)
 
 
 class StripeTestPageView(View):

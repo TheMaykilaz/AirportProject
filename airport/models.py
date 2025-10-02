@@ -221,89 +221,101 @@ class TicketManager(models.Manager):
         base = flight.base_price
         mult = self.SEAT_CLASS_MULTIPLIERS.get(seat_class, Decimal("1.00"))
         return (base * mult).quantize(Decimal("0.01"))
-
     def book_tickets(self, order, seat_numbers):
         if order.status != OrderStatus.PROCESSING:
             raise ValidationError("Order is not in processing state.")
 
         flight = order.flight
         airplane = flight.airplane
-        airplane_seats = {s["seat_number"]: s["seat_class"] for s in airplane.seat_map}
+
+        # Build seat map - handle both dict and string formats
+        airplane_seats = {}
+        for s in airplane.seat_map:
+            if isinstance(s, dict):
+                seat_number = s.get("seat_number")
+                seat_class = s.get("seat_class", "economy")
+            else:
+                seat_number = str(s)
+                seat_class = "economy"
+            airplane_seats[seat_number] = seat_class
 
         for seat_num in seat_numbers:
             if seat_num not in airplane_seats:
                 raise ValidationError(f"Seat {seat_num} does not exist on this airplane.")
-
+        
         created_tickets = []
-        total_price = Decimal('0')
+        total_price = Decimal("0")
         now = timezone.now()
 
         with transaction.atomic():
+            # 2️⃣ блокируем рейс для конкурентного бронирования
             flight = Flight.objects.select_for_update().get(pk=flight.pk)
 
-            existing_seats = FlightSeat.objects.filter(
+            # 3️⃣ проверяем, что места ещё свободны
+            busy_seats = FlightSeat.objects.filter(
                 flight=flight,
                 seat_number__in=seat_numbers
             ).exclude(seat_status=FlightSeat.SeatStatus.AVAILABLE)
 
-            if existing_seats.exists():
-                raise ValidationError("One or more seats are no longer available.")
+            if busy_seats.exists():
+                taken = [s.seat_number for s in busy_seats]
+                raise ValidationError(f"Seats already booked or reserved: {', '.join(taken)}")
 
-            new_seats = []
-            for seat_num in seat_numbers:
-                new_seats.append(
-                    FlightSeat(
-                        flight=flight,
-                        seat_number=seat_num,
-                        seat_status=FlightSeat.SeatStatus.RESERVED,
-                        locked_at=now,
-                    )
+            # 4️⃣ создаём FlightSeat (если ещё не существует)
+            existing = set(
+                FlightSeat.objects.filter(flight=flight, seat_number__in=seat_numbers)
+                .values_list("seat_number", flat=True)
+            )
+
+            new_seats = [
+                FlightSeat(
+                    flight=flight,
+                    seat_number=seat_num,
+                    seat_status=FlightSeat.SeatStatus.RESERVED,
+                    locked_at=now,
                 )
+                for seat_num in seat_numbers if seat_num not in existing
+            ]
+            if new_seats:
+                FlightSeat.objects.bulk_create(new_seats)
 
-            FlightSeat.objects.bulk_create(new_seats)
+            # 5️⃣ создаём билеты
+            seats = FlightSeat.objects.filter(flight=flight, seat_number__in=seat_numbers)
+            seat_map = {s.seat_number: s for s in seats}
 
             for seat_num in seat_numbers:
                 seat_class = airplane_seats[seat_num]
                 price = self._calculate_price(flight, seat_class)
                 total_price += price
 
-                flight_seat = FlightSeat.objects.get(flight=flight, seat_number=seat_num)
                 ticket = self.create(
                     order=order,
-                    seat=flight_seat,
+                    seat=seat_map[seat_num],
                     price=price,
                     status=TicketStatus.BOOKED,
                 )
                 created_tickets.append(ticket)
 
+            # 6️⃣ пересчитываем стоимость заказа
             order.total_price = total_price
             order.save(update_fields=["total_price"])
-            # Order remains in PROCESSING until payment succeeds
 
         return created_tickets
 
     def book_ticket(self, order, seat_number):
         return self.book_tickets(order, [seat_number])[0]
-        with transaction.atomic():
-            tickets = self.filter(order=order)
-            seat_ids = tickets.values_list('seat_id', flat=True)
-
-            FlightSeat.objects.filter(id__in=seat_ids).update(
-                seat_status=FlightSeat.SeatStatus.AVAILABLE,
-                locked_at=None
-            )
-            tickets.update(status=TicketStatus.CANCELLED)
 
     def cancel_by_order(self, order, reason=""):
         with transaction.atomic():
             tickets = self.filter(order=order)
-            seat_ids = tickets.values_list('seat_id', flat=True)
+            seat_ids = tickets.values_list("seat_id", flat=True)
 
             FlightSeat.objects.filter(id__in=seat_ids).update(
                 seat_status=FlightSeat.SeatStatus.AVAILABLE,
                 locked_at=None
             )
             tickets.update(status=TicketStatus.CANCELLED)
+
 
 
 class Ticket(TimeStampedModel):
