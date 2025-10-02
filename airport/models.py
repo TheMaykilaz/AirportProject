@@ -278,6 +278,7 @@ class TicketManager(models.Manager):
 
             order.total_price = total_price
             order.save(update_fields=["total_price"])
+
             # Order remains in PROCESSING until payment succeeds
 
         return created_tickets
