@@ -359,7 +359,7 @@ class Payment(models.Model):
         except Exception:
             raise ValueError("Invalid amount for Stripe PaymentIntent")
 
-        if amount_int < 50:  # для USD мінімум 50 cents
+        if amount_int < 50:  # for USD, minimum is 50 cents
             raise ValueError("Amount too small for Stripe PaymentIntent")
 
         try:
