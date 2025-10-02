@@ -14,9 +14,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 from datetime import timedelta
 
-load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load .env file from the project root
+load_dotenv(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
@@ -28,11 +30,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = [
-    'localhost',
-    '127.0.0.1',
-    'creamy-ungritty-shanon.ngrok-free.dev',
-]
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '.ngrok.io', '.ngrok-free.dev', 'creamy-ungritty-shanon.ngrok-free.dev']
 
 
 # Application definition
@@ -48,6 +46,10 @@ INSTALLED_APPS = [
     'AirplaneDJ',
     'airport',
     'rest_framework',
+    'rest_framework_simplejwt.token_blacklist',
+    'stripe_payment',
+    'drf_spectacular',
+    'drf_spectacular_sidecar',
 ]
 
 REST_FRAMEWORK = {
@@ -56,8 +58,15 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
-    )
+    ),
+    'DEFAULT_SCHEMA_CLASS': ('drf_spectacular.openapi.AutoSchema'),
 }
+
+AUTHENTICATION_BACKENDS = (
+    'django.contrib.auth.backends.ModelBackend',
+)
+SOCIAL_AUTH_LOGIN_REDIRECT_URL = "/api/users/me/"
+GOOGLE_REDIRECT_URI = os.getenv('GOOGLE_REDIRECT_URI')
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
@@ -68,6 +77,25 @@ SIMPLE_JWT = {
 }
 
 AUTH_USER_MODEL = 'user.User'
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_TOKEN_URL = os.getenv("GOOGLE_TOKEN_URL")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+GOOGLE_USERINFO_URL = os.getenv("GOOGLE_USERINFO_URL")
+GOOGLE_AUTHORIZATION_URL = os.getenv("GOOGLE_AUTHORIZATION_URL")
+
+STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY')
+STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
+STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET')
+
+# Email Configuration
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@airplanedj.com')
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
