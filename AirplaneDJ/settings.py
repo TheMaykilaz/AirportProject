@@ -30,7 +30,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '.ngrok.io', '.ngrok-free.dev', 'creamy-ungritty-shanon.ngrok-free.dev']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '.ngrok.io', '.ngrok-free.dev', 'creamy-ungritty-shanon.ngrok-free.dev', '0.0.0.0', 'web']
 
 
 # Application definition
@@ -47,7 +47,7 @@ INSTALLED_APPS = [
     'airport',
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
-    'strip_payment',
+    'stripe_payment',
     'drf_spectacular',
     'drf_spectacular_sidecar',
 ]
