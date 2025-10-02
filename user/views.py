@@ -229,7 +229,7 @@ class GoogleVerifyTokenView(APIView):
 
         userinfo = verify_google_token(id_token_str, settings.GOOGLE_CLIENT_ID)
         if not userinfo or not userinfo.get('email'):
-            return Response({"error": "Invalid Google token"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Invalid credentials"}, status=status.HTTP_400_BAD_REQUEST)
 
         user, _ = User.objects.get_or_create(
             email=userinfo["email"],
