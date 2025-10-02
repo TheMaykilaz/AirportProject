@@ -70,7 +70,6 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
 # Stripe webhook
 @csrf_exempt
-@csrf_exempt
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def stripe_webhook(request):
