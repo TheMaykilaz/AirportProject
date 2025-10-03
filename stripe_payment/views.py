@@ -143,30 +143,30 @@ def stripe_webhook(request):
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
     except ValueError as e:
-        print(f"❌ Webhook error: Invalid payload - {e}")
+        print(f"[ERROR] Webhook error: Invalid payload - {e}")
         return Response({"error": "Invalid payload"}, status=400)
     except stripe.error.SignatureVerificationError as e:
-        print(f"❌ Webhook error: Invalid signature - {e}")
+        print(f"[ERROR] Webhook error: Invalid signature - {e}")
         return Response({"error": "Invalid signature"}, status=400)
     
     event_type = event["type"]
-    print(f"✅ Received webhook: {event_type}")
+    print(f"[SUCCESS] Received webhook: {event_type}")
     
     if event_type == "payment_intent.succeeded":
         try:
             payment = Payment.objects.get(stripe_payment_intent_id=event["data"]["object"]["id"])
             payment.mark_succeeded()
-            print(f"✅ Payment {payment.id} marked as succeeded")
+            print(f"[SUCCESS] Payment {payment.id} marked as succeeded")
         except Payment.DoesNotExist:
-            print(f"⚠️ Payment not found for intent: {event['data']['object']['id']}")
+            print(f"[WARNING] Payment not found for intent: {event['data']['object']['id']}")
     
     elif event_type == "payment_intent.payment_failed":
         try:
             payment = Payment.objects.get(stripe_payment_intent_id=event["data"]["object"]["id"])
             payment.mark_failed()
-            print(f"❌ Payment {payment.id} marked as failed")
+            print(f"[ERROR] Payment {payment.id} marked as failed")
         except Payment.DoesNotExist:
-            print(f"⚠️ Payment not found for intent: {event['data']['object']['id']}")
+            print(f"[WARNING] Payment not found for intent: {event['data']['object']['id']}")
     
     # Acknowledge all events
     return Response({"status": "success", "event_type": event_type}, status=200)

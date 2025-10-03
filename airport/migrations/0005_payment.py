@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('airport', '0004_order_alter_ticket_options_and_more'),
+        ('airport', '0001_initial'),
     ]
 
     operations = [
