@@ -219,6 +219,7 @@ class PaymentSerializer(serializers.ModelSerializer):
 
 class OrderPaymentCreateSerializer(serializers.Serializer):
     user_id = serializers.IntegerField(required=False)
+
     flight_id = serializers.PrimaryKeyRelatedField(queryset=Flight.objects.all())
     seat_numbers = serializers.ListField(
         child=serializers.CharField(), required=False, allow_empty=True
