@@ -65,115 +65,12 @@ class TicketStatus(models.TextChoices):
 
 
 class TicketManager(models.Manager):
-    SEAT_CLASS_MULTIPLIERS = {
-        "economy": Decimal("1.00"),
-        "business": Decimal("1.75"),
-        "first": Decimal("3.00"),
-    }
-
-    def _calculate_price(self, flight, seat_class):
-        base = flight.base_price
-        mult = self.SEAT_CLASS_MULTIPLIERS.get(seat_class, Decimal("1.00"))
-        return (base * mult).quantize(Decimal("0.01"))
-
-    def book_tickets(self, order, seat_numbers):
-        from airport.models import Flight, FlightSeat
-        
-        if order.status != OrderStatus.PROCESSING:
-            raise ValidationError("Order is not in processing state.")
-
-        flight = order.flight
-        airplane = flight.airplane
-
-        # Build seat map - handle both dict and string formats
-        airplane_seats = {}
-        for s in airplane.seat_map:
-            if isinstance(s, dict):
-                seat_number = s.get("seat_number")
-                seat_class = s.get("seat_class", "economy")
-            else:
-                seat_number = str(s)
-                seat_class = "economy"
-            airplane_seats[seat_number] = seat_class
-
-        for seat_num in seat_numbers:
-            if seat_num not in airplane_seats:
-                raise ValidationError(f"Seat {seat_num} does not exist on this airplane.")
-        
-        created_tickets = []
-        total_price = Decimal("0")
-        now = timezone.now()
-
-        with transaction.atomic():
-            # Lock flight for concurrent booking
-            flight = Flight.objects.select_for_update().get(pk=flight.pk)
-
-            # Check that seats are still available
-            busy_seats = FlightSeat.objects.filter(
-                flight=flight,
-                seat_number__in=seat_numbers
-            ).exclude(seat_status=FlightSeat.SeatStatus.AVAILABLE)
-
-            if busy_seats.exists():
-                taken = [s.seat_number for s in busy_seats]
-                raise ValidationError(f"Seats already booked or reserved: {', '.join(taken)}")
-
-            # Create FlightSeat objects if they don't exist
-            existing = set(
-                FlightSeat.objects.filter(flight=flight, seat_number__in=seat_numbers)
-                .values_list("seat_number", flat=True)
-            )
-
-            new_seats = [
-                FlightSeat(
-                    flight=flight,
-                    seat_number=seat_num,
-                    seat_status=FlightSeat.SeatStatus.RESERVED,
-                    locked_at=now,
-                )
-                for seat_num in seat_numbers if seat_num not in existing
-            ]
-            if new_seats:
-                FlightSeat.objects.bulk_create(new_seats)
-
-            # Create tickets
-            seats = FlightSeat.objects.filter(flight=flight, seat_number__in=seat_numbers)
-            seat_map = {s.seat_number: s for s in seats}
-
-            for seat_num in seat_numbers:
-                seat_class = airplane_seats[seat_num]
-                price = self._calculate_price(flight, seat_class)
-                total_price += price
-
-                ticket = self.create(
-                    order=order,
-                    seat=seat_map[seat_num],
-                    price=price,
-                    status=TicketStatus.BOOKED,
-                )
-                created_tickets.append(ticket)
-
-            # Update order total price
-            order.total_price = total_price
-            order.save(update_fields=["total_price"])
-
-        return created_tickets
-
-    def book_ticket(self, order, seat_number):
-        return self.book_tickets(order, [seat_number])[0]
-
+    """Simplified ticket manager - complex logic moved to services"""
+    
     def cancel_by_order(self, order, reason=""):
-        from airport.models import FlightSeat
-        
-        with transaction.atomic():
-            tickets = self.filter(order=order)
-            seat_ids = tickets.values_list("seat_id", flat=True)
-
-            FlightSeat.objects.filter(id__in=seat_ids).update(
-                seat_status=FlightSeat.SeatStatus.AVAILABLE,
-                locked_at=None
-            )
-            tickets.update(status=TicketStatus.CANCELLED)
+        """Cancel all tickets for an order"""
+        from .services import BookingService
+        BookingService.cancel_booking(order, reason)
 
 
 class Ticket(TimeStampedModel):

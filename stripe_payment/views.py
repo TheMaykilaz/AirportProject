@@ -1,8 +1,10 @@
 import stripe
+import logging
 from django.conf import settings
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.csrf import csrf_exempt
 from django.views import View
+from django.db import transaction
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
@@ -10,7 +12,7 @@ from rest_framework.permissions import AllowAny
 from drf_spectacular.utils import extend_schema, OpenApiExample
 
 from bookings.models import Order
-from .models import Payment
+from .models import Payment, PaymentStatus
 from .serializers import PaymentSerializer
 from AirplaneDJ.permissions import IsAdmin, IsSelfOrAdmin, ReadOnly
 from AirplaneDJ.settings import STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PUBLISHABLE_KEY
@@ -133,43 +135,147 @@ class PaymentViewSet(viewsets.ModelViewSet):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+logger = logging.getLogger(__name__)
+
 @csrf_exempt
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def stripe_webhook(request):
+    """
+    Improved Stripe webhook handler with better error handling and logging
+    """
     payload = request.body
     sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
+    event_id = None
 
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
+        event_id = event.get("id")
+        event_type = event.get("type")
+        
+        logger.info(f"Received Stripe webhook: {event_type} (ID: {event_id})")
+        
     except ValueError as e:
-        print(f"[ERROR] Webhook error: Invalid payload - {e}")
+        logger.error(f"Webhook error - Invalid payload: {e}")
         return Response({"error": "Invalid payload"}, status=400)
     except stripe.error.SignatureVerificationError as e:
-        print(f"[ERROR] Webhook error: Invalid signature - {e}")
+        logger.error(f"Webhook error - Invalid signature: {e}")
         return Response({"error": "Invalid signature"}, status=400)
     
-    event_type = event["type"]
-    print(f"[SUCCESS] Received webhook: {event_type}")
+    # Handle different event types
+    try:
+        if event_type == "payment_intent.succeeded":
+            return _handle_payment_succeeded(event)
+        elif event_type == "payment_intent.payment_failed":
+            return _handle_payment_failed(event)
+        elif event_type == "checkout.session.completed":
+            return _handle_checkout_completed(event)
+        elif event_type == "checkout.session.expired":
+            return _handle_checkout_expired(event)
+        else:
+            logger.info(f"Unhandled webhook event type: {event_type}")
+            return Response({"status": "ignored", "event_type": event_type}, status=200)
+            
+    except Exception as e:
+        logger.error(f"Error processing webhook {event_id}: {str(e)}", exc_info=True)
+        return Response({"error": "Internal server error"}, status=500)
+
+
+def _handle_payment_succeeded(event):
+    """Handle successful payment intent"""
+    payment_intent_id = event["data"]["object"]["id"]
     
-    if event_type == "payment_intent.succeeded":
-        try:
-            payment = Payment.objects.get(stripe_payment_intent_id=event["data"]["object"]["id"])
+    try:
+        with transaction.atomic():
+            payment = Payment.objects.select_for_update().get(
+                stripe_payment_intent_id=payment_intent_id
+            )
+            
+            # Prevent duplicate processing
+            if payment.status == PaymentStatus.SUCCEEDED:
+                logger.info(f"Payment {payment.id} already processed as succeeded")
+                return Response({"status": "already_processed"}, status=200)
+            
+            # Mark payment as succeeded and confirm booking
             payment.mark_succeeded()
-            print(f"[SUCCESS] Payment {payment.id} marked as succeeded")
-        except Payment.DoesNotExist:
-            print(f"[WARNING] Payment not found for intent: {event['data']['object']['id']}")
+            logger.info(f"Payment {payment.id} marked as succeeded, order {payment.order.id} confirmed")
+            
+            return Response({
+                "status": "success", 
+                "payment_id": payment.id,
+                "order_id": payment.order.id
+            }, status=200)
+            
+    except Payment.DoesNotExist:
+        logger.warning(f"Payment not found for intent: {payment_intent_id}")
+        return Response({"error": "Payment not found"}, status=404)
+    except Exception as e:
+        logger.error(f"Error processing payment success: {str(e)}")
+        return Response({"error": "Processing failed"}, status=500)
+
+
+def _handle_payment_failed(event):
+    """Handle failed payment intent"""
+    payment_intent_id = event["data"]["object"]["id"]
+    failure_reason = event["data"]["object"].get("last_payment_error", {}).get("message", "Unknown")
     
-    elif event_type == "payment_intent.payment_failed":
-        try:
-            payment = Payment.objects.get(stripe_payment_intent_id=event["data"]["object"]["id"])
+    try:
+        with transaction.atomic():
+            payment = Payment.objects.select_for_update().get(
+                stripe_payment_intent_id=payment_intent_id
+            )
+            
+            # Prevent duplicate processing
+            if payment.status == PaymentStatus.FAILED:
+                logger.info(f"Payment {payment.id} already processed as failed")
+                return Response({"status": "already_processed"}, status=200)
+            
+            # Mark payment as failed and handle order
             payment.mark_failed()
-            print(f"[ERROR] Payment {payment.id} marked as failed")
-        except Payment.DoesNotExist:
-            print(f"[WARNING] Payment not found for intent: {event['data']['object']['id']}")
+            logger.error(f"Payment {payment.id} failed: {failure_reason}")
+            
+            return Response({
+                "status": "success", 
+                "payment_id": payment.id,
+                "order_id": payment.order.id,
+                "failure_reason": failure_reason
+            }, status=200)
+            
+    except Payment.DoesNotExist:
+        logger.warning(f"Payment not found for failed intent: {payment_intent_id}")
+        return Response({"error": "Payment not found"}, status=404)
+    except Exception as e:
+        logger.error(f"Error processing payment failure: {str(e)}")
+        return Response({"error": "Processing failed"}, status=500)
+
+
+def _handle_checkout_completed(event):
+    """Handle completed checkout session"""
+    session = event["data"]["object"]
+    payment_intent_id = session.get("payment_intent")
     
-    # Acknowledge all events
-    return Response({"status": "success", "event_type": event_type}, status=200)
+    if payment_intent_id:
+        logger.info(f"Checkout session completed for payment intent: {payment_intent_id}")
+        # The payment_intent.succeeded event will handle the actual confirmation
+    
+    return Response({"status": "success"}, status=200)
+
+
+def _handle_checkout_expired(event):
+    """Handle expired checkout session"""
+    session = event["data"]["object"]
+    payment_intent_id = session.get("payment_intent")
+    
+    if payment_intent_id:
+        try:
+            payment = Payment.objects.get(stripe_payment_intent_id=payment_intent_id)
+            if payment.status == PaymentStatus.PENDING:
+                payment.mark_cancelled()
+                logger.info(f"Checkout expired, cancelled payment {payment.id} and order {payment.order.id}")
+        except Payment.DoesNotExist:
+            logger.warning(f"Payment not found for expired checkout: {payment_intent_id}")
+    
+    return Response({"status": "success"}, status=200)
 
 
 class StripeTestPageView(View):

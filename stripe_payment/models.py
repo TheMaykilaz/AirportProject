@@ -43,11 +43,48 @@ class Payment(TimeStampedModel):
         return intent
 
     def mark_succeeded(self):
+        """Mark payment as succeeded and confirm the booking"""
+        from bookings.services import BookingService
+        
         self.status = PaymentStatus.SUCCEEDED
         self.save(update_fields=["status"])
-        self.order.mark_confirmed()
+        
+        # Use BookingService to properly confirm the booking
+        try:
+            BookingService.confirm_booking(self.order)
+        except Exception as e:
+            # Log error but don't fail the payment - manual intervention needed
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to confirm booking for payment {self.id}: {str(e)}")
 
     def mark_failed(self):
+        """Mark payment as failed and handle order cancellation"""
+        from bookings.services import BookingService
+        
         self.status = PaymentStatus.FAILED
         self.save(update_fields=["status"])
-        self.order.mark_failed()
+        
+        # Cancel the booking to release seats
+        try:
+            BookingService.cancel_booking(self.order, reason="Payment failed")
+        except Exception as e:
+            # Log error but continue - seats will be released by timeout
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to cancel booking for payment {self.id}: {str(e)}")
+
+    def mark_cancelled(self):
+        """Mark payment as cancelled"""
+        from bookings.services import BookingService
+        
+        self.status = PaymentStatus.CANCELLED
+        self.save(update_fields=["status"])
+        
+        # Cancel the booking to release seats
+        try:
+            BookingService.cancel_booking(self.order, reason="Payment cancelled")
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to cancel booking for payment {self.id}: {str(e)}")

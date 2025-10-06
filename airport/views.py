@@ -92,6 +92,16 @@ class FlightViewSet(viewsets.ModelViewSet):
         if self.request.method in ["GET", "HEAD", "OPTIONS"]:
             return [ReadOnly()]
         return [IsAdmin()]
+    
+    @action(detail=True, methods=["get"], permission_classes=[ReadOnly])
+    def seat_map(self, request, pk=None):
+        """Get seat map with availability and pricing"""
+        from bookings.services import SeatMapService
+        
+        flight = self.get_object()
+        seat_map_data = SeatMapService.get_available_seats(flight)
+        
+        return Response(seat_map_data)
 
     @action(detail=True, methods=["post"], permission_classes=[IsAdmin])
     def update_status(self, request, pk=None):

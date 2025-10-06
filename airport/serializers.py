@@ -16,7 +16,7 @@ User = get_user_model()
 class CountrySerializer(serializers.ModelSerializer):
     class Meta:
         model = Country
-        fields = ["id", "name", "slug"]
+        fields = ["id", "name", "code", "slug"]
 
 
 class AirportSerializer(serializers.ModelSerializer):
@@ -27,7 +27,7 @@ class AirportSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Airport
-        fields = ["id", "name", "code", "country", "country_id"]
+        fields = ["id", "name", "code", "city", "timezone", "country", "country_id"]
 
 
 class AirlineSerializer(serializers.ModelSerializer):
@@ -38,7 +38,7 @@ class AirlineSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Airline
-        fields = ["id", "name", "airports", "airport_ids"]
+        fields = ["id", "name", "code", "airports", "airport_ids"]
 
 
 class AirplaneSerializer(serializers.ModelSerializer):
@@ -53,6 +53,7 @@ class AirplaneSerializer(serializers.ModelSerializer):
             "id",
             "manufacturer",
             "model",
+            "registration",
             "airline",
             "airline_id",
             "capacity",
@@ -109,8 +110,11 @@ class FlightSerializer(serializers.ModelSerializer):
             "arrival_airport_id",
             "departure_time",
             "arrival_time",
+            "departure_date",
             "status",
             "base_price",
+            "gate",
+            "actual_departure",
+            "actual_arrival",
             "flight_seats",
-            "departure_date",
         ]
