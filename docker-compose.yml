@@ -23,7 +23,6 @@ services:
     container_name: airport_web
     command: gunicorn AirplaneDJ.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
     volumes:
-      - .:/app
       - static_volume:/app/staticfiles
     ports:
       - "8000:8000"
