@@ -1,7 +1,7 @@
 import stripe
 from django.conf import settings
 from django.db import models
-from airport.models import Order, TimeStampedModel
+from bookings.models import Order, TimeStampedModel
 
 
 class PaymentStatus(models.TextChoices):

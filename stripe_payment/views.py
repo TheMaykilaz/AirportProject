@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from drf_spectacular.utils import extend_schema, OpenApiExample
 
-from airport.models import Order
+from bookings.models import Order
 from .models import Payment
 from .serializers import PaymentSerializer
 from AirplaneDJ.permissions import IsAdmin, IsSelfOrAdmin, ReadOnly
