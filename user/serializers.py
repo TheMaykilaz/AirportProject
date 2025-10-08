@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import User, UserProfile, EmailVerificationCode, LoginAttempt
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework import serializers as drf_serializers
+from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -97,24 +98,47 @@ class UserSerializer(serializers.ModelSerializer):
         return instance
 
 
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            'Registration Example',
+            summary='User registration example',
+            description='Example data for user registration',
+            value={
+                "username": "testuser",
+                "email": "test@example.com",
+                "password": "testpass123",
+                "first_name": "Test",
+                "last_name": "User"
+            },
+            request_only=True,
+        )
+    ]
+)
 class RegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
         write_only=True,
         required=True,
-        min_length=8
+        min_length=8,
+        help_text="Password must be at least 8 characters long"
+    )
+    email = serializers.EmailField(
+        required=True,
+        help_text="Valid email address"
+    )
+    username = serializers.CharField(
+        required=True,
+        help_text="Unique username"
     )
 
     class Meta:
         model = User
         fields = (
-            "id",
             "email",
-            "username",
+            "username", 
             "password",
             "first_name",
             "last_name",
-            "google_id",
-            "phone",
         )
 
     def create(self, validated_data):
@@ -140,15 +164,53 @@ class ChangePasswordSerializer(serializers.Serializer):
     new_password = serializers.CharField(write_only=True, min_length=8)
 
 
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            'Email Request Example',
+            summary='Request verification code',
+            description='Request a verification code to be sent to email',
+            value={
+                "email": "test@example.com"
+            },
+            request_only=True,
+        )
+    ]
+)
 class EmailLoginRequestSerializer(serializers.Serializer):
     """Serializer for requesting a verification code via email."""
-    email = serializers.EmailField(required=True)
+    email = serializers.EmailField(
+        required=True,
+        help_text="Email address to send verification code to"
+    )
 
 
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            'Email Verify Example',
+            summary='Verify email code',
+            description='Verify the email verification code',
+            value={
+                "email": "test@example.com",
+                "code": "123456"
+            },
+            request_only=True,
+        )
+    ]
+)
 class EmailLoginVerifySerializer(serializers.Serializer):
     """Serializer for verifying the email code and logging in."""
-    email = serializers.EmailField(required=True)
-    code = serializers.CharField(required=True, min_length=6, max_length=6)
+    email = serializers.EmailField(
+        required=True,
+        help_text="Email address that received the code"
+    )
+    code = serializers.CharField(
+        required=True, 
+        min_length=6, 
+        max_length=6,
+        help_text="6-digit verification code from email"
+    )
 
 
 class UserPublicSerializer(serializers.ModelSerializer):
