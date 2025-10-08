@@ -15,8 +15,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/users/', include('user.urls')),
     path('api/airport/', include('airport.urls')),
-
-    path("api/payments/", include("strip_payment.urls")),
+  
+    path("api/payments/", include("stripe_payment.urls")),
     path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 

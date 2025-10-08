@@ -47,7 +47,7 @@ INSTALLED_APPS = [
     'airport',
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
-    'strip_payment',
+    'stripe_payment',
     'drf_spectacular',
     'drf_spectacular_sidecar',
 ]
