@@ -61,7 +61,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             "tickets": [{"id": t.id, "seat": t.seat.seat_number, "price": str(t.price)} for t in order.tickets.all()],
             "total_price": str(order.total_price),
             "status": order.status,
-            "reservation_expires_at": order.created_at + timedelta(minutes=15)
+            "reservation_expires_at": order.created_at + timedelta(minutes=30)
         }, status=status.HTTP_201_CREATED)
     
     @action(detail=True, methods=["post"], permission_classes=[IsSelfOrAdmin])
