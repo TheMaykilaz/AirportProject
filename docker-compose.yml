@@ -2,6 +2,7 @@ services:
   db:
     image: postgres:16-alpine
     container_name: airport_db
+    restart: unless-stopped
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
@@ -19,6 +20,7 @@ services:
   web:
     build: .
     container_name: airport_web
+    restart: unless-stopped
     command: gunicorn AirplaneDJ.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
     volumes:
       - static_volume:/app/staticfiles
