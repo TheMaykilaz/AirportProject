@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'user',
     'AirplaneDJ',
     'airport',
+    'ai_chat',
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
     'strip_payment',
@@ -96,6 +97,13 @@ EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@airplanedj.com')
 
+# AI Chat Configuration
+LLAMA_MODEL_NAME = os.getenv('LLAMA_MODEL_NAME', 'llama-2-7b-chat')
+LLAMA_API_BASE = os.getenv('LLAMA_API_BASE', 'https://api-inference.huggingface.co/models/meta-llama/Llama-2-7b-chat-hf')
+LLAMA_API_KEY = os.getenv('LLAMA_API_KEY', '')
+LLAMA_MODEL_PATH = os.getenv('LLAMA_MODEL_PATH', '')  # Path to local LLaMA model file (e.g., 'C:/path/to/model.bin')
+LLAMA_MAX_TOKENS = int(os.getenv('LLAMA_MAX_TOKENS', 512))
+LLAMA_TEMPERATURE = float(os.getenv('LLAMA_TEMPERATURE', 0.7))
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
