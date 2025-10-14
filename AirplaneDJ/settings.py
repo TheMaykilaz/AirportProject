@@ -30,7 +30,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'oDmOq6lKA1IpVQ5Sfy6-xvDlj3nPnyimdtmuy1m3pD
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '.ngrok.io', '.ngrok-free.dev', 'creamy-ungritty-shanon.ngrok-free.dev']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '.ngrok.io', '.ngrok-free.dev', 'creamy-ungritty-shanon.ngrok-free.dev', '0.0.0.0', 'web']
 
 
 # Application definition
@@ -194,6 +194,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
