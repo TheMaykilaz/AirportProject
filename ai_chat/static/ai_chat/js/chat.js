@@ -5,10 +5,14 @@ class AIChat {
         this.messages = [];
         this.isWaitingForResponse = false;
         this.conversationHistory = [];
+        this.websocket = null;
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
 
         this.initializeElements();
         this.bindEvents();
         this.loadConversationHistory();
+        this.connectWebSocket();
     }
 
     initializeElements() {
@@ -57,6 +61,9 @@ class AIChat {
         // Handle page unload
         window.addEventListener('beforeunload', () => {
             this.saveConversationHistory();
+            if (this.websocket) {
+                this.websocket.close();
+            }
         });
     }
 
@@ -68,7 +75,11 @@ class AIChat {
     async sendMessage() {
         const message = this.messageInput.value.trim();
 
-        if (!message || this.isWaitingForResponse) {
+        if (!message || this.isWaitingForResponse || !this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
+            if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
+                this.addMessage('assistant', 'Connection lost. Trying to reconnect...');
+                this.connectWebSocket();
+            }
             return;
         }
 
@@ -84,54 +95,207 @@ class AIChat {
         this.setWaitingState(true);
 
         try {
-            // Send message to API
-            const response = await this.callChatAPI(message);
-
-            // Hide typing indicator
-            this.hideTypingIndicator();
-
-            // Add AI response to chat
-            this.addMessage('assistant', response);
+            // Send message via WebSocket
+            this.websocket.send(JSON.stringify({
+                type: 'chat',
+                message: message
+            }));
 
         } catch (error) {
             console.error('Error sending message:', error);
             this.hideTypingIndicator();
             this.addMessage('assistant', 'Sorry, I encountered an error. Please try again.');
-        } finally {
             this.setWaitingState(false);
+            // Reset WebSocket connection if needed
+            if (this.websocket && this.websocket.readyState !== WebSocket.OPEN) {
+                this.connectWebSocket();
+            }
         }
     }
 
-    async callChatAPI(message) {
-        const response = await fetch('/api/ai-chat/api/chat/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': this.getCSRFToken(),
-            },
-            body: JSON.stringify({
-                message: message,
-                conversation_history: this.conversationHistory.slice(-10) // Keep last 10 messages
-            })
-        });
+    connectWebSocket() {
+        // Use configured WebSocket URL from Django settings if available
+        const wsUrl = window.AI_CHAT_WEBSOCKET_URL || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/chat/`;
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        console.log('Connecting to WebSocket:', wsUrl);
+
+        try {
+            this.websocket = new WebSocket(wsUrl);
+
+            this.websocket.onopen = (event) => {
+                console.log('WebSocket connected');
+                this.reconnectAttempts = 0;
+                this.updateConnectionStatus('Connected', 'connected');
+            };
+
+            this.websocket.onmessage = (event) => {
+                this.handleWebSocketMessage(event);
+            };
+
+            this.websocket.onclose = (event) => {
+                console.log('WebSocket closed:', event.code, event.reason);
+                this.updateConnectionStatus('Disconnected', 'disconnected');
+                this.attemptReconnect();
+            };
+
+            this.websocket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                this.updateConnectionStatus('Error', 'error');
+            };
+
+        } catch (error) {
+            console.error('Failed to create WebSocket connection:', error);
+            this.updateConnectionStatus('Failed to connect', 'error');
+        }
+    }
+
+    attemptReconnect() {
+        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+            console.log('Max reconnection attempts reached');
+            this.updateConnectionStatus('Connection failed', 'error');
+            return;
         }
 
-        const data = await response.json();
+        this.reconnectAttempts++;
+        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
 
-        if (data.error) {
-            throw new Error(data.error);
+        console.log(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
+
+        setTimeout(() => {
+            this.connectWebSocket();
+        }, delay);
+    }
+
+    handleWebSocketMessage(event) {
+        try {
+            const data = JSON.parse(event.data);
+            console.log('Received WebSocket message:', data.type);
+
+            switch (data.type) {
+                case 'welcome':
+                    this.addMessage('assistant', data.message);
+                    break;
+
+                case 'stream_chunk':
+                    this.handleStreamChunk(data.chunk);
+                    break;
+
+                case 'response_complete':
+                    this.handleResponseComplete(data.full_response);
+                    break;
+
+                case 'error':
+                    this.handleWebSocketError(data.message);
+                    break;
+
+                case 'history_cleared':
+                    this.addMessage('assistant', data.message);
+                    break;
+
+                default:
+                    console.warn('Unknown message type:', data.type);
+            }
+
+        } catch (error) {
+            console.error('Error parsing WebSocket message:', error);
+        }
+    }
+
+    handleStreamChunk(chunk) {
+        // For streaming, we'll accumulate chunks and display them progressively
+        if (!this.currentStreamingMessage) {
+            // Start a new streaming message
+            this.currentStreamingMessage = this.addStreamingMessage('assistant', '');
         }
 
-        // Update conversation history
-        this.conversationHistory.push(
-            { role: 'user', content: message },
-            { role: 'assistant', content: data.response }
-        );
+        // Append chunk to current message
+        this.appendToStreamingMessage(chunk);
+    }
 
-        return data.response;
+    handleResponseComplete(fullResponse) {
+        this.hideTypingIndicator();
+        this.setWaitingState(false);
+
+        if (this.currentStreamingMessage) {
+            // Update with final response
+            this.finalizeStreamingMessage(fullResponse);
+            this.currentStreamingMessage = null;
+        } else {
+            // Fallback: add complete message
+            this.addMessage('assistant', fullResponse);
+        }
+    }
+
+    handleWebSocketError(message) {
+        this.hideTypingIndicator();
+        this.setWaitingState(false);
+        this.addMessage('assistant', `Error: ${message}`);
+    }
+
+    addStreamingMessage(role, initialContent) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${role}-message streaming`;
+
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'message-avatar';
+        avatarDiv.textContent = role === 'user' ? 'You' : 'AI';
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+
+        const messageContent = document.createElement('p');
+        messageContent.textContent = initialContent;
+        messageContent.className = 'streaming-content';
+        contentDiv.appendChild(messageContent);
+
+        const timeDiv = document.createElement('div');
+        timeDiv.className = 'message-time';
+        timeDiv.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        if (role === 'user') {
+            messageDiv.appendChild(contentDiv);
+            messageDiv.appendChild(avatarDiv);
+            messageDiv.appendChild(timeDiv);
+        } else {
+            messageDiv.appendChild(avatarDiv);
+            messageDiv.appendChild(contentDiv);
+            messageDiv.appendChild(timeDiv);
+        }
+
+        this.chatMessages.appendChild(messageDiv);
+        this.scrollToBottom();
+
+        return {
+            element: messageDiv,
+            contentElement: messageContent,
+            currentContent: initialContent
+        };
+    }
+
+    appendToStreamingMessage(chunk) {
+        if (this.currentStreamingMessage) {
+            this.currentStreamingMessage.currentContent += chunk;
+            this.currentStreamingMessage.contentElement.textContent = this.currentStreamingMessage.currentContent;
+            this.scrollToBottom();
+        }
+    }
+
+    finalizeStreamingMessage(finalContent) {
+        if (this.currentStreamingMessage) {
+            this.currentStreamingMessage.contentElement.textContent = finalContent;
+            this.currentStreamingMessage.element.classList.remove('streaming');
+            this.scrollToBottom();
+        }
+    }
+
+    updateConnectionStatus(status, statusClass) {
+        const statusIndicator = document.querySelector('.status-indicator');
+        const statusText = document.querySelector('.status-text');
+
+        if (statusIndicator && statusText) {
+            statusIndicator.className = `status-indicator ${statusClass}`;
+            statusText.textContent = status;
+        }
     }
 
     addMessage(role, content) {
@@ -200,6 +364,13 @@ class AIChat {
             this.messages = [];
             this.conversationHistory = [];
             this.saveConversationHistory();
+
+            // Send clear history command via WebSocket
+            if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+                this.websocket.send(JSON.stringify({
+                    type: 'clear_history'
+                }));
+            }
 
             // Add welcome message back
             const welcomeDiv = document.createElement('div');
