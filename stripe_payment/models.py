@@ -1,7 +1,9 @@
 import stripe
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 from bookings.models import Order, TimeStampedModel
+from user.models import User
 
 
 class PaymentStatus(models.TextChoices):
@@ -13,7 +15,9 @@ class PaymentStatus(models.TextChoices):
 
 class Payment(TimeStampedModel):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="payments")
+    coupon = models.ForeignKey('Coupon', on_delete=models.SET_NULL, null=True, blank=True, related_name="payments")
     amount = models.DecimalField(max_digits=12, decimal_places=2)
+    discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     currency = models.CharField(max_length=10, default="usd")
     stripe_payment_intent_id = models.CharField(max_length=255, blank=True, null=True)
     status = models.CharField(
@@ -76,15 +80,66 @@ class Payment(TimeStampedModel):
 
     def mark_cancelled(self):
         """Mark payment as cancelled"""
-        from bookings.services import BookingService
-        
         self.status = PaymentStatus.CANCELLED
         self.save(update_fields=["status"])
-        
-        # Cancel the booking to release seats
+
+        # Cancel the order to release seats
         try:
-            BookingService.cancel_booking(self.order, reason="Payment cancelled")
+            self.order.cancel(reason="Payment cancelled")
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
-            logger.error(f"Failed to cancel booking for payment {self.id}: {str(e)}")
+            logger.error(f"Failed to cancel order for payment {self.id}: {str(e)}")
+
+
+class CouponStatus(models.TextChoices):
+    ACTIVE = "active", "Active"
+    USED = "used", "Used"
+    EXPIRED = "expired", "Expired"
+    CANCELLED = "cancelled", "Cancelled"
+
+
+class Coupon(TimeStampedModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="coupons")
+    balance = models.DecimalField(max_digits=12, decimal_places=2, help_text="Remaining coupon balance")
+    original_amount = models.DecimalField(max_digits=12, decimal_places=2, help_text="Original coupon amount")
+    stripe_coupon_id = models.CharField(max_length=255, blank=True, null=True, help_text="Stripe coupon ID")
+    status = models.CharField(
+        max_length=20, choices=CouponStatus.choices, default=CouponStatus.ACTIVE
+    )
+    expires_at = models.DateTimeField(null=True, blank=True, help_text="Coupon expiry date")
+    description = models.TextField(blank=True, help_text="Coupon description/reason")
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user"]),
+            models.Index(fields=["status"]),
+            models.Index(fields=["expires_at"]),
+        ]
+
+    def __str__(self):
+        return f"Coupon {self.id} for {self.user} - ${self.balance} ({self.status})"
+
+    def is_expired(self):
+        """Check if coupon is expired"""
+        if self.expires_at and timezone.now() > self.expires_at:
+            return True
+        return False
+
+    def is_usable(self):
+        """Check if coupon can be used"""
+        return (
+            self.status == CouponStatus.ACTIVE
+            and self.balance > 0
+            and not self.is_expired()
+        )
+
+    def deduct_amount(self, amount):
+        """Deduct amount from coupon balance"""
+        if amount > self.balance:
+            raise ValueError("Insufficient coupon balance")
+        self.balance -= amount
+        if self.balance == 0:
+            self.status = CouponStatus.USED
+        self.save(update_fields=["balance", "status"])
+        return amount

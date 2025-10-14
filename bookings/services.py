@@ -13,8 +13,8 @@ from airport.models import Flight, FlightSeat
 
 class SeatReservationService:
     """Handles seat reservations with timeout management"""
-    
-    RESERVATION_TIMEOUT_MINUTES = 15
+
+    RESERVATION_TIMEOUT_MINUTES = 30
     
     @classmethod
     def reserve_seats(cls, flight: Flight, seat_numbers: List[str], user_id: Optional[int] = None) -> List[FlightSeat]:
