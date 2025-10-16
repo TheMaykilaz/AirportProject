@@ -41,7 +41,6 @@ def ai_chat_window(request: HttpRequest) -> HttpResponse:
     
     context = {
         'title': 'AI Assistant Chat',
-        'websocket_url': getattr(settings, 'AI_CHAT_WEBSOCKET_URL', None),
         'user': request.user,
     }
     return render(request, 'ai_chat/chat_window.html', context)

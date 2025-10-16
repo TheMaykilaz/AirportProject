@@ -45,8 +45,8 @@ class ModelConfig:
             api_key=getattr(settings, 'LLAMA_API_KEY', None),
             max_tokens=getattr(settings, 'LLAMA_MAX_TOKENS', 128),
             temperature=getattr(settings, 'LLAMA_TEMPERATURE', 0.3),
-            context_length=512,
-            threads=2
+            context_length=getattr(settings, 'LLAMA_CONTEXT_LENGTH', 1024),
+            threads=getattr(settings, 'LLAMA_THREADS', max(1, (os.cpu_count() or 2) - 1))
         )
 
 
@@ -113,21 +113,38 @@ class ModelLoader:
     
     @staticmethod
     def load_model(config: ModelConfig):
-        """Load model with fallback chain."""
-        loaders = [
-            ModelLoader.load_llama_cpp,
-            ModelLoader.load_ctransformers,
-        ]
-        
-        for loader in loaders:
-            try:
-                return loader(config)
-            except Exception as e:
-                logger.debug(f"Loader {loader.__name__} failed, trying next option")
-                continue
-        
-        logger.warning("All model backends failed, using fallback mode")
-        return None, ModelBackend.FALLBACK
+        """Select appropriate backend based on configuration."""
+        try:
+            # Prefer local model only if a valid path is configured
+            if config.model_path and os.path.exists(config.model_path):
+                loaders = [
+                    ModelLoader.load_llama_cpp,
+                    ModelLoader.load_ctransformers,
+                ]
+                for loader in loaders:
+                    try:
+                        return loader(config)
+                    except Exception:
+                        logger.debug(f"Loader {loader.__name__} failed, trying next option")
+                        continue
+                # If local attempts fail, fall back to API if available
+                if config.api_base:
+                    logger.warning("Local model loading failed, switching to API backend")
+                    return None, ModelBackend.API
+                logger.warning("Local model loading failed and no API configured; using fallback mode")
+                return None, ModelBackend.FALLBACK
+
+            # No local model configured, use API if available
+            if config.api_base:
+                logger.info("No local model configured. Using API backend.")
+                return None, ModelBackend.API
+
+            # Nothing configured, use fallback
+            logger.warning("No model path or API configured; using fallback mode")
+            return None, ModelBackend.FALLBACK
+        except Exception:
+            logger.error("Unexpected error during model selection", exc_info=True)
+            return None, ModelBackend.FALLBACK
 
 
 class PromptBuilder:
@@ -286,7 +303,8 @@ class LlamaAIAssistant:
             'temperature': self.config.temperature,
             'top_p': 0.8,
             'top_k': 30,
-            'stop': ["</s>", "[INST]", "\n\n"],
+            # Keep stop list minimal to avoid premature truncation
+            'stop': ["</s>"],
         }
         
         logger.debug(f"Generation parameters: {generation_params}")
@@ -317,7 +335,7 @@ class LlamaAIAssistant:
                     top_p=generation_params['top_p'],
                     top_k=generation_params['top_k'],
                     stop=generation_params['stop'],
-                    repetition_penalty=1.2
+                    repetition_penalty=1.15
                 )
                 result = response.strip()
             
