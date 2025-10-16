@@ -5,10 +5,12 @@ class AIChat {
         this.messages = [];
         this.isWaitingForResponse = false;
         this.conversationHistory = [];
+        this.ws = null;
 
         this.initializeElements();
         this.bindEvents();
         this.loadConversationHistory();
+        this.initWebSocket();
     }
 
     initializeElements() {
@@ -84,14 +86,20 @@ class AIChat {
         this.setWaitingState(true);
 
         try {
-            // Send message to API
-            const response = await this.callChatAPI(message);
-
-            // Hide typing indicator
-            this.hideTypingIndicator();
-
-            // Add AI response to chat
-            this.addMessage('assistant', response);
+            // Prefer WebSocket if available
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                this.ws.send(JSON.stringify({
+                    message: message,
+                    conversation_history: this.conversationHistory.slice(-10)
+                }));
+            } else {
+                // Fallback to HTTP API
+                const response = await this.callChatAPI(message);
+                // Hide typing indicator
+                this.hideTypingIndicator();
+                // Add AI response to chat
+                this.addMessage('assistant', response);
+            }
 
         } catch (error) {
             console.error('Error sending message:', error);
@@ -99,6 +107,45 @@ class AIChat {
             this.addMessage('assistant', 'Sorry, I encountered an error. Please try again.');
         } finally {
             this.setWaitingState(false);
+        }
+    }
+
+    initWebSocket() {
+        try {
+            const loc = window.location;
+            const scheme = loc.protocol === 'https:' ? 'wss' : 'ws';
+            const wsUrl = `${scheme}://${loc.host}/ws/ai-chat/`;
+            this.ws = new WebSocket(wsUrl);
+
+            this.ws.onopen = () => {
+                // Connected
+            };
+
+            this.ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'assistant' && data.response) {
+                        this.hideTypingIndicator();
+                        this.addMessage('assistant', data.response);
+                        this.conversationHistory.push({ role: 'assistant', content: data.response });
+                    } else if (data.type === 'user' && data.message) {
+                        // Skip echoing our own last message
+                    }
+                } catch (e) {
+                    console.warn('Invalid WS message', e);
+                }
+            };
+
+            this.ws.onclose = () => {
+                // Try reconnect after delay
+                setTimeout(() => this.initWebSocket(), 2000);
+            };
+
+            this.ws.onerror = () => {
+                // Ignore, fallback will be used
+            };
+        } catch (e) {
+            // Ignore, fallback will be used
         }
     }
 
