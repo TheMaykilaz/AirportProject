@@ -15,20 +15,27 @@ class TimeStampedModel(models.Model):
 
 class Country(models.Model):
     name = models.CharField(max_length=100, unique=True)
+    code = models.CharField(max_length=2, unique=True, help_text="ISO 3166-1 alpha-2 code (e.g., US, GB)", default="XX")
     slug = models.SlugField(max_length=120, unique=True, blank=True)
 
     class Meta:
         verbose_name_plural = "Countries"
         ordering = ["name"]
 
+    def clean(self):
+        if self.code:
+            self.code = self.code.upper()
+
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.code})"
 
 
 class Airport(models.Model):
     name = models.CharField(max_length=100)
     country = models.ForeignKey(Country, on_delete=models.PROTECT, related_name="airports")
-    code = models.CharField(max_length=3, unique=True, db_index=True, help_text="IATA code")
+    code = models.CharField(max_length=3, unique=True, db_index=True, help_text="IATA code (e.g., JFK, LHR)")
+    city = models.CharField(max_length=100, help_text="City where airport is located", default="Unknown")
+    timezone = models.CharField(max_length=50, default="UTC", help_text="Airport timezone (e.g., America/New_York)")
 
     class Meta:
         constraints = [
@@ -36,50 +43,93 @@ class Airport(models.Model):
         ]
         ordering = ["name"]
 
+    def clean(self):
+        if self.code:
+            self.code = self.code.upper()
+
     def __str__(self):
-        return f"{self.name} ({self.code})"
+        return f"{self.name} ({self.code}) - {self.city}, {self.country.code}"
 
 
 class Airline(models.Model):
     name = models.CharField(max_length=100, unique=True)
-    airports = models.ManyToManyField(Airport, related_name="airlines")
+    code = models.CharField(max_length=3, unique=True, help_text="IATA airline code (e.g., AA, BA)", default="XXX")
+    airports = models.ManyToManyField(Airport, related_name="airlines", blank=True)
 
     class Meta:
         ordering = ["name"]
 
+    def clean(self):
+        if self.code:
+            self.code = self.code.upper()
+
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.code})"
 
 
 class Airplane(models.Model):
+    class SeatClass(models.TextChoices):
+        ECONOMY = "economy", "Economy"
+        PREMIUM_ECONOMY = "premium_economy", "Premium Economy"
+        BUSINESS = "business", "Business"
+        FIRST = "first", "First Class"
+
     manufacturer = models.CharField(max_length=100)
     model = models.CharField(max_length=100)
+    registration = models.CharField(max_length=10, unique=True, help_text="Aircraft registration (e.g., N123AA)", default="N000XX")
     airline = models.ForeignKey(Airline, on_delete=models.PROTECT, related_name="airplanes")
 
     capacity = models.PositiveIntegerField(help_text="Total number of seats")
-    seat_map = models.JSONField(help_text="List of seat definitions", default=list)
+    seat_map = models.JSONField(
+        help_text="List of seat definitions with seat_number and seat_class", 
+        default=list,
+        blank=True
+    )
 
     class Meta:
         indexes = [models.Index(fields=["airline"])]
+        constraints = [
+            models.UniqueConstraint(fields=["airline", "registration"], name="unique_registration_per_airline")
+        ]
 
     def clean(self):
-        seat_nums = [s.get("seat_number") for s in self.seat_map]
-        if len(seat_nums) != self.capacity:
-            raise ValidationError("seat_map entries length must equal capacity.")
-        if len(set(seat_nums)) != len(seat_nums):
-            raise ValidationError("Duplicate seat_number in seat_map.")
-        for s in self.seat_map:
-            if s.get("seat_class") not in ("economy", "business", "first"):
-                raise ValidationError(f"Invalid seat_class for {s.get('seat_number')}")
+        if self.registration:
+            self.registration = self.registration.upper()
+        
+        if self.seat_map:
+            seat_nums = [s.get("seat_number") for s in self.seat_map if isinstance(s, dict)]
+            
+            if len(seat_nums) != self.capacity:
+                raise ValidationError("Number of seats in seat_map must equal capacity.")
+            
+            if len(set(seat_nums)) != len(seat_nums):
+                raise ValidationError("Duplicate seat numbers in seat_map.")
+            
+            valid_classes = [choice[0] for choice in self.SeatClass.choices]
+            for seat in self.seat_map:
+                if isinstance(seat, dict):
+                    seat_class = seat.get("seat_class", "economy")
+                    if seat_class not in valid_classes:
+                        raise ValidationError(f"Invalid seat_class '{seat_class}' for seat {seat.get('seat_number')}")
 
     def seat_class(self, seat_number):
-        for s in self.seat_map:
-            if s["seat_number"] == seat_number:
-                return s["seat_class"]
-        raise KeyError(f"Seat {seat_number} not present in airplane seat map")
+        """Get seat class for a specific seat number"""
+        for seat in self.seat_map:
+            if isinstance(seat, dict) and seat.get("seat_number") == seat_number:
+                return seat.get("seat_class", "economy")
+        return "economy"  # Default fallback
+
+    def get_seat_count_by_class(self):
+        """Get count of seats by class"""
+        counts = {choice[0]: 0 for choice in self.SeatClass.choices}
+        for seat in self.seat_map:
+            if isinstance(seat, dict):
+                seat_class = seat.get("seat_class", "economy")
+                counts[seat_class] = counts.get(seat_class, 0) + 1
+        return counts
 
     def __str__(self):
-        return f"{self.airline.name} - {self.manufacturer} {self.model} ({self.capacity} seats)"
+        return f"{self.airline.code} {self.manufacturer} {self.model} ({self.registration})"
 
 
 class Flight(TimeStampedModel):
@@ -97,17 +147,21 @@ class Flight(TimeStampedModel):
     departure_airport = models.ForeignKey(Airport, on_delete=models.PROTECT, related_name="departing_flights")
     arrival_airport = models.ForeignKey(Airport, on_delete=models.PROTECT, related_name="arriving_flights")
 
-    departure_time = models.DateTimeField(help_text="UTC datetime", db_index=True)
-    arrival_time = models.DateTimeField(help_text="UTC datetime")
+    departure_time = models.DateTimeField(help_text="Scheduled departure time (UTC)", db_index=True)
+    arrival_time = models.DateTimeField(help_text="Scheduled arrival time (UTC)")
     departure_date = models.DateField(
-        help_text="date for unique flight instances",
-        db_index=True,
-        default=timezone.now
+        help_text="Flight date for grouping and searching",
+        db_index=True
     )
 
     status = models.CharField(max_length=15, choices=FlightStatus.choices, default=FlightStatus.SCHEDULED,
                               db_index=True)
-    base_price = models.DecimalField(max_digits=12, decimal_places=2, help_text="Base ticket price")
+    base_price = models.DecimalField(max_digits=12, decimal_places=2, help_text="Base economy class price")
+    
+    # Optional fields for better flight management
+    gate = models.CharField(max_length=10, blank=True, help_text="Departure gate")
+    actual_departure = models.DateTimeField(null=True, blank=True, help_text="Actual departure time")
+    actual_arrival = models.DateTimeField(null=True, blank=True, help_text="Actual arrival time")
 
     class Meta:
         ordering = ["departure_time"]
@@ -128,9 +182,44 @@ class Flight(TimeStampedModel):
             raise ValidationError("Departure and arrival airports cannot be the same.")
         if self.airplane_id and self.airline_id and self.airplane.airline_id != self.airline_id:
             raise ValidationError("Airplane's airline must match Flight.airline.")
+        if self.departure_time and self.arrival_time and self.departure_time >= self.arrival_time:
+            raise ValidationError("Arrival time must be after departure time.")
+        
+        # Auto-set departure_date from departure_time if not provided
+        if self.departure_time and not self.departure_date:
+            self.departure_date = self.departure_time.date()
+
+    @property
+    def duration(self):
+        """Calculate flight duration"""
+        if self.departure_time and self.arrival_time:
+            return self.arrival_time - self.departure_time
+        return None
+
+    @property
+    def is_delayed(self):
+        """Check if flight is delayed"""
+        return self.status == self.FlightStatus.DELAYED
+
+    @property
+    def is_active(self):
+        """Check if flight is still active (not departed, cancelled)"""
+        return self.status in [self.FlightStatus.SCHEDULED, self.FlightStatus.BOARDING, self.FlightStatus.DELAYED]
+
+    def get_available_seat_count(self):
+        """Get count of available seats"""
+        return self.seats.filter(seat_status=FlightSeat.SeatStatus.AVAILABLE).count()
+
+    def get_occupancy_rate(self):
+        """Get flight occupancy rate as percentage"""
+        total_seats = self.airplane.capacity
+        booked_seats = self.seats.filter(
+            seat_status__in=[FlightSeat.SeatStatus.BOOKED, FlightSeat.SeatStatus.RESERVED]
+        ).count()
+        return (booked_seats / total_seats * 100) if total_seats > 0 else 0
 
     def __str__(self):
-        return f"{self.airline.name} {self.flight_number}: {self.departure_airport.code} → {self.arrival_airport.code} on {self.departure_date}"
+        return f"{self.airline.code} {self.flight_number}: {self.departure_airport.code} → {self.arrival_airport.code} on {self.departure_date}"
 
 
 class FlightSeat(models.Model):
@@ -153,242 +242,19 @@ class FlightSeat(models.Model):
         indexes = [models.Index(fields=["flight", "seat_status"])]
 
     def seat_class(self):
+        """Get the class of this seat"""
         return self.flight.airplane.seat_class(self.seat_number)
 
-    def __str__(self):
-        return f"{self.flight} - Seat {self.seat_number} ({self.seat_status})"
+    @property
+    def is_available(self):
+        """Check if seat is available for booking"""
+        return self.seat_status == self.SeatStatus.AVAILABLE
 
-
-class OrderStatus(models.TextChoices):
-    PROCESSING = "processing", "Processing"
-    CONFIRMED = "confirmed", "Confirmed"
-    FAILED = "failed", "Failed"
-    CANCELLED = "cancelled", "Cancelled"
-
-
-class Order(TimeStampedModel):
-    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="orders")
-    flight = models.ForeignKey(Flight, on_delete=models.PROTECT, related_name="orders")
-    status = models.CharField(max_length=20, choices=OrderStatus.choices, default=OrderStatus.PROCESSING)
-    total_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["user"]),
-            models.Index(fields=["flight"]),
-        ]
+    @property
+    def is_reserved(self):
+        """Check if seat is currently reserved"""
+        return self.seat_status == self.SeatStatus.RESERVED
 
     def __str__(self):
-        return f"Order {self.id} by {self.user} for {self.flight} ({self.get_status_display()})"
+        return f"{self.flight.airline.code} {self.flight.flight_number} - Seat {self.seat_number} ({self.seat_status})"
 
-    def mark_confirmed(self):
-        self.status = OrderStatus.CONFIRMED
-        self.save(update_fields=["status"])
-
-    def mark_failed(self):
-        self.status = OrderStatus.FAILED
-        self.save(update_fields=["status"])
-
-    def confirm(self):
-        self.mark_confirmed()
-
-    def fail_and_release(self, reason=""):
-        with transaction.atomic():
-            Ticket.objects.release_by_order(self)
-            self.mark_failed()
-
-    def cancel(self, reason=""):
-        with transaction.atomic():
-            Ticket.objects.cancel_by_order(self)
-            self.status = OrderStatus.CANCELLED
-            self.save(update_fields=["status"])
-
-
-class TicketStatus(models.TextChoices):
-    BOOKED = "booked", "Booked"
-    CANCELLED = "cancelled", "Cancelled"
-    COMPLETED = "completed", "Completed"
-
-
-class TicketManager(models.Manager):
-    SEAT_CLASS_MULTIPLIERS = {
-        "economy": Decimal("1.00"),
-        "business": Decimal("1.75"),
-        "first": Decimal("3.00"),
-    }
-
-    def _calculate_price(self, flight, seat_class):
-        base = flight.base_price
-        mult = self.SEAT_CLASS_MULTIPLIERS.get(seat_class, Decimal("1.00"))
-        return (base * mult).quantize(Decimal("0.01"))
-
-    def book_tickets(self, order, seat_numbers):
-        if order.status != OrderStatus.PROCESSING:
-            raise ValidationError("Order is not in processing state.")
-
-        flight = order.flight
-        airplane = flight.airplane
-        airplane_seats = {s["seat_number"]: s["seat_class"] for s in airplane.seat_map}
-
-        for seat_num in seat_numbers:
-            if seat_num not in airplane_seats:
-                raise ValidationError(f"Seat {seat_num} does not exist on this airplane.")
-
-        created_tickets = []
-        total_price = Decimal('0')
-        now = timezone.now()
-
-        with transaction.atomic():
-            flight = Flight.objects.select_for_update().get(pk=flight.pk)
-
-            existing_seats = FlightSeat.objects.filter(
-                flight=flight,
-                seat_number__in=seat_numbers
-            ).exclude(seat_status=FlightSeat.SeatStatus.AVAILABLE)
-
-            if existing_seats.exists():
-                raise ValidationError("One or more seats are no longer available.")
-
-            new_seats = []
-            for seat_num in seat_numbers:
-                new_seats.append(
-                    FlightSeat(
-                        flight=flight,
-                        seat_number=seat_num,
-                        seat_status=FlightSeat.SeatStatus.RESERVED,
-                        locked_at=now,
-                    )
-                )
-
-            FlightSeat.objects.bulk_create(new_seats)
-
-            for seat_num in seat_numbers:
-                seat_class = airplane_seats[seat_num]
-                price = self._calculate_price(flight, seat_class)
-                total_price += price
-
-                flight_seat = FlightSeat.objects.get(flight=flight, seat_number=seat_num)
-                ticket = self.create(
-                    order=order,
-                    seat=flight_seat,
-                    price=price,
-                    status=TicketStatus.BOOKED,
-                )
-                created_tickets.append(ticket)
-
-            order.total_price = total_price
-            # Order remains in PROCESSING until payment succeeds
-
-        return created_tickets
-
-    def book_ticket(self, order, seat_number):
-        return self.book_tickets(order, [seat_number])[0]
-
-    def release_by_order(self, order):
-        with transaction.atomic():
-            tickets = self.filter(order=order)
-            seat_ids = tickets.values_list('seat_id', flat=True)
-
-            FlightSeat.objects.filter(id__in=seat_ids).update(
-                seat_status=FlightSeat.SeatStatus.AVAILABLE,
-                locked_at=None
-            )
-            tickets.update(status=TicketStatus.CANCELLED)
-
-    def cancel_by_order(self, order, reason=""):
-        with transaction.atomic():
-            tickets = self.filter(order=order)
-            seat_ids = tickets.values_list('seat_id', flat=True)
-
-            FlightSeat.objects.filter(id__in=seat_ids).update(
-                seat_status=FlightSeat.SeatStatus.AVAILABLE,
-                locked_at=None
-            )
-            tickets.update(status=TicketStatus.CANCELLED)
-
-
-class Ticket(TimeStampedModel):
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="tickets", null = True)
-    seat = models.ForeignKey(FlightSeat, on_delete=models.PROTECT, related_name="tickets")
-    price = models.DecimalField(max_digits=12, decimal_places=2)
-    status = models.CharField(max_length=20, choices=TicketStatus.choices, default=TicketStatus.BOOKED)
-
-    objects = TicketManager()
-
-    class Meta:
-        constraints = [
-            models.CheckConstraint(check=models.Q(price__gte=0), name="ticket_price_non_negative"),
-        ]
-        indexes = [
-            models.Index(fields=["order"]),
-            models.Index(fields=["seat"]),
-        ]
-
-    def __str__(self):
-        return f"Ticket {self.id} for {self.order.user} - {self.seat} ({self.status})"
-
-class PaymentStatus(models.TextChoices):
-    PENDING = "pending", "Pending"
-    SUCCEEDED = "succeeded", "Succeeded"
-    FAILED = "failed", "Failed"
-
-class Payment(models.Model):
-    order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name="payment")
-    stripe_payment_intent_id = models.CharField(max_length=255, blank=True, null=True)
-    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    status = models.CharField(max_length=20, choices=PaymentStatus.choices, default=PaymentStatus.PENDING)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def create_stripe_payment_intent(self, currency="usd"):
-        try:
-            import stripe
-            from AirplaneDJ.settings import STRIPE_SECRET_KEY
-        except Exception:
-            stripe = None
-            STRIPE_SECRET_KEY = None
-
-        if stripe is None or not STRIPE_SECRET_KEY:
-            raise RuntimeError("Stripe not configured")
-
-        stripe.api_key = STRIPE_SECRET_KEY
-
-
-        try:
-            amount_int = int(float(self.amount) * 100)
-        except Exception:
-            raise ValueError("Invalid amount for Stripe PaymentIntent")
-
-        if amount_int < 50:  # for USD, minimum is 50 cents
-            raise ValueError("Amount too small for Stripe PaymentIntent")
-
-        try:
-            intent = stripe.PaymentIntent.create(
-                amount=amount_int,
-                currency=currency,
-                metadata={"order_id": str(self.order.id)},
-                payment_method_types=["card"],
-            )
-        except stripe.error.InvalidRequestError as e:
-            raise ValueError(f"Stripe error: {str(e)}")
-
-        self.stripe_payment_intent_id = intent["id"]
-        self.save(update_fields=["stripe_payment_intent_id"])
-        return intent
-
-    def mark_succeeded(self):
-        self.status = PaymentStatus.SUCCEEDED
-        self.save(update_fields=["status"])
-        # On success, finalize order and seats
-        from django.utils import timezone
-        Ticket.objects.filter(order=self.order).update(status=TicketStatus.BOOKED)
-        FlightSeat.objects.filter(
-            id__in=Ticket.objects.filter(order=self.order).values_list("seat_id", flat=True)
-        ).update(seat_status=FlightSeat.SeatStatus.BOOKED, locked_at=timezone.now())
-        self.order.mark_confirmed()
-
-    def mark_failed(self):
-        self.status = PaymentStatus.FAILED
-        self.save(update_fields=["status"])
-        # Release seats and fail order
-        self.order.fail_and_release()
