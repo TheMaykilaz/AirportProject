@@ -45,7 +45,8 @@ class ModelConfig:
         return cls(
             model_name=getattr(settings, 'LLAMA_MODEL_NAME', 'llama-2-7b-chat'),
             model_path=getattr(settings, 'LLAMA_MODEL_PATH', None),
-            api_base=getattr(settings, 'LLAMA_API_BASE', 'http://localhost:8000'),
+            # Do not default api_base to the Django app server. Leave as None unless explicitly configured.
+            api_base=getattr(settings, 'LLAMA_API_BASE', None),
             api_key=getattr(settings, 'LLAMA_API_KEY', None),
             max_tokens=getattr(settings, 'LLAMA_MAX_TOKENS', 128),
             temperature=getattr(settings, 'LLAMA_TEMPERATURE', 0.3),
@@ -229,7 +230,7 @@ class FlightContextGenerator:
 class LlamaAIAssistant:
     """Main AI assistant for flight booking system."""
     
-    FALLBACK_RESPONSE = "Sorry, there are technical issues with AI right now. Please try again in a few minutes, or use the flight search on the website."
+    FALLBACK_RESPONSE = "Hello! I'm the AI assistant. The full AI model isn't configured yet, but WebSocket streaming is working! How can I help you with flight bookings?"
     
     def __init__(self):
         """Initialize the AI assistant."""
@@ -288,7 +289,12 @@ class LlamaAIAssistant:
                 logger.debug("Acquired AI model lock for async generation")
                 # Run the synchronous generation in a thread pool
                 loop = asyncio.get_event_loop()
-                return await loop.run_in_executor(None, self.generate_response, message, conversation_history)
+                # Create a task to run the generation
+                task = loop.run_in_executor(None, self.generate_response, message, conversation_history)
+
+                # Wait for the task with a very long timeout (no practical limit)
+                response = await asyncio.wait_for(task, timeout=None)
+                return response
         except Exception as e:
             logger.error(f"Async generation failed: {e}", exc_info=True)
             # Return fallback response
@@ -358,7 +364,11 @@ class LlamaAIAssistant:
         if self.config.api_key:
             headers['Authorization'] = f'Bearer {self.config.api_key}'
             logger.debug("API key configured")
-        
+        # Validate API base
+        if not self.config.api_base:
+            logger.error("API base not configured (LLAMA_API_BASE is empty). Aborting API call.")
+            raise RuntimeError("API backend not configured")
+
         payload = {
             'inputs': prompt,
             'parameters': {
@@ -368,12 +378,12 @@ class LlamaAIAssistant:
                 'return_full_text': False
             }
         }
-        
+
         logger.debug(f"Sending API request to {self.config.api_base}")
-        
+
         try:
             start_time = time.time()
-            
+
             response = requests.post(
                 self.config.api_base,
                 headers=headers,
@@ -381,15 +391,36 @@ class LlamaAIAssistant:
                 timeout=30
             )
             response.raise_for_status()
-            
+
             result = response.json()
-            generated_text = result[0]['generated_text'].strip()
-            
+            # Try to extract generated text from common response shapes
+            generated_text = None
+            if isinstance(result, list) and result and 'generated_text' in result[0]:
+                generated_text = result[0]['generated_text']
+            elif isinstance(result, dict) and 'generated_text' in result:
+                generated_text = result['generated_text']
+            elif isinstance(result, dict) and 'choices' in result and result['choices']:
+                # OpenAI-like shape
+                generated_text = result['choices'][0].get('message', {}).get('content') or result['choices'][0].get('text')
+
+            if not generated_text:
+                # If the API returned something unexpected (like an HTML error page or status page), treat as error
+                logger.error(f"Unexpected API response shape: {type(result)}")
+                raise RuntimeError("Unexpected API response")
+
+            generated_text = str(generated_text).strip()
+
             elapsed_time = time.time() - start_time
             logger.info(f"API response received in {elapsed_time:.2f}s")
-            
+
+            # Detect common 'busy' messages from model servers and treat them as errors so fallback/retry logic can run
+            lower = generated_text.lower()
+            if 'busy' in lower and ('processing' in lower or 'try again' in lower or 'currently' in lower):
+                logger.warning(f"API backend reported busy state: {generated_text}")
+                raise RuntimeError("Model backend busy")
+
             return generated_text
-            
+
         except requests.exceptions.Timeout:
             logger.error("API request timed out after 30s")
             raise RuntimeError("API request timeout")

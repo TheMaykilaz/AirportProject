@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'channels',
     'user',
     'AirplaneDJ',
     'airport',
@@ -99,7 +100,11 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@airplanedj.com')
 
 # AI Chat Configuration
 LLAMA_MODEL_NAME = os.getenv('LLAMA_MODEL_NAME', 'llama-2-7b-chat')
-LLAMA_API_BASE = os.getenv('LLAMA_API_BASE', 'https://api-inference.huggingface.co/models/meta-llama/Llama-2-7b-chat-hf')
+# Do NOT default LLAMA_API_BASE to a URL. Leaving it unset (None) avoids accidental
+# POSTs to non-model endpoints (for example your Django app). If you want to use
+# a remote API backend, set LLAMA_API_BASE in your .env explicitly, e.g.:
+# LLAMA_API_BASE=https://api-inference.huggingface.co/models/<model>
+LLAMA_API_BASE = os.getenv('LLAMA_API_BASE')
 LLAMA_API_KEY = os.getenv('LLAMA_API_KEY', '')
 LLAMA_MODEL_PATH = os.getenv('LLAMA_MODEL_PATH', '')  # Path to local LLaMA model file (e.g., 'C:/path/to/model.bin')
 LLAMA_MAX_TOKENS = int(os.getenv('LLAMA_MAX_TOKENS', 512))
@@ -134,6 +139,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'AirplaneDJ.wsgi.application'
+ASGI_APPLICATION = 'AirplaneDJ.asgi.application'
 
 
 # Database
@@ -191,3 +197,10 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Channels configuration
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}

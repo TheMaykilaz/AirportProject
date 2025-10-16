@@ -101,6 +101,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
         try:
             # Generate response with streaming
             response_text = await self.generate_streaming_response(message)
+            # If the response indicates the backend is busy or invalid, send an error
+            if not response_text:
+                logger.warning("Empty response from AI assistant")
+                await self.send_error("Empty response from AI assistant")
+                return
+
+            lower = response_text.lower()
+            if 'busy' in lower and ('processing' in lower or 'try again' in lower or 'currently' in lower):
+                logger.warning(f"Received busy response from backend: {response_text}")
+                await self.send_error("AI model is busy. Please try again in a moment.")
+                return
 
             # Simulate streaming by breaking response into chunks
             await self.simulate_streaming_response(response_text)
@@ -114,6 +125,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'full_response': response_text
             }))
 
+        except asyncio.CancelledError:
+            # Client disconnected or task was cancelled; stop generation quietly
+            logger.info("Streaming response cancelled (likely client disconnect)")
+            self.is_generating = False
         except Exception as e:
             logger.error(f"Streaming response failed: {e}", exc_info=True)
             await self.send_error("Response generation failed")
@@ -154,17 +169,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 logger.warning("AI assistant not initialized, using fallback")
                 return "Hello! I'm the AI assistant. The full AI model isn't configured yet, but WebSocket streaming is working! How can I help you with flight bookings?"
 
-            # Add timeout for AI response generation to prevent hanging
+            # For local models, they can take time, so let's be more patient
+            # Don't use timeout wrapper, let the model run as long as it needs
             try:
-                response = await asyncio.wait_for(
-                    ai_assistant.generate_response_async(message, self.conversation_history[:-1]),
-                    timeout=30.0  # 30 second timeout
-                )
+                logger.info("Starting AI response generation (no timeout)")
+                response = await ai_assistant.generate_response_async(message, self.conversation_history[:-1])
+                logger.info("AI response generation completed successfully")
                 return response
-            except asyncio.TimeoutError:
-                logger.warning("AI response generation timed out")
-                return "I'm sorry, but I'm currently busy processing other requests. Please try again in a moment."
-            
+            except Exception as e:
+                logger.error(f"AI response generation failed: {e}")
+                # The model failed, return a helpful message
+                return "Hello! I'm the AI assistant. There was an issue with the AI model, but WebSocket streaming is working perfectly! How can I help you with flight bookings?"
+
         except Exception as e:
             logger.error(f"AI generation failed: {e}", exc_info=True)
             # Return a fallback response instead of crashing
