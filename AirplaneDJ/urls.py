@@ -25,6 +25,8 @@ urlpatterns = [
     path("api/auth/google/login/", GoogleLoginView.as_view(), name="google-login-legacy"),
     path("api/auth/google/callback/", GoogleCallbackView.as_view(), name="google-callback-legacy"),
 
+    # AI Chat
+    path('', include('ai_chat.urls')),
 
     #Swagger
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
