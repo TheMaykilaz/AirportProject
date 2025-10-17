@@ -21,7 +21,8 @@ services:
     build: .
     container_name: airport_web
     restart: unless-stopped
-    command: gunicorn AirplaneDJ.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
+    # Use Daphne (ASGI) to support WebSockets via Django Channels
+    command: daphne -b 0.0.0.0 -p 8001 AirplaneDJ.asgi:application
     volumes:
       - static_volume:/app/staticfiles
     ports:
@@ -50,6 +51,19 @@ services:
       - EMAIL_HOST_USER=${EMAIL_HOST_USER:-}
       - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-}
       - DEFAULT_FROM_EMAIL=noreply@airplanedj.com
+      # Channels / Redis config
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - db
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    container_name: airport_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
     depends_on:
       db:
         condition: service_healthy
