@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from .models import User, UserProfile, EmailVerificationCode, LoginAttempt
-from .email_utils import send_verification_email
+from .email_utils import send_verification_code
 import logging
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ class UserService:
         
         # Send email
         try:
-            send_verification_email(email, verification_code.code, code_type)
+            send_verification_code(email, verification_code.code)
             logger.info(f"Verification code sent to {email}")
             return verification_code
         except Exception as e:
