@@ -11,7 +11,7 @@ from django.conf import settings
 from django.core.cache import cache
 
 
-# Configure logger
+
 logger = logging.getLogger(__name__)
 
 
@@ -34,6 +34,9 @@ class ModelConfig:
     temperature: float
     context_length: int
     threads: int
+    top_k: int
+    top_p: float
+    repetition_penalty: float
     
     @classmethod
     def from_settings(cls):
@@ -43,10 +46,13 @@ class ModelConfig:
             model_path=getattr(settings, 'LLAMA_MODEL_PATH', None),
             api_base=getattr(settings, 'LLAMA_API_BASE', 'http://localhost:8000'),
             api_key=getattr(settings, 'LLAMA_API_KEY', None),
-            max_tokens=getattr(settings, 'LLAMA_MAX_TOKENS', 128),
-            temperature=getattr(settings, 'LLAMA_TEMPERATURE', 0.3),
+            max_tokens=getattr(settings, 'LLAMA_MAX_TOKENS', 160),
+            temperature=getattr(settings, 'LLAMA_TEMPERATURE', 0.6),
             context_length=getattr(settings, 'LLAMA_CONTEXT_LENGTH', 1024),
-            threads=getattr(settings, 'LLAMA_THREADS', max(1, (os.cpu_count() or 2) - 1))
+            threads=getattr(settings, 'LLAMA_THREADS', max(1, (os.cpu_count() or 2) - 1)),
+            top_k=getattr(settings, 'LLAMA_TOP_K', 20),
+            top_p=getattr(settings, 'LLAMA_TOP_P', 0.7),
+            repetition_penalty=getattr(settings, 'LLAMA_REPETITION_PENALTY', 1.15),
         )
 
 
@@ -174,16 +180,19 @@ For booking, you need: name, passport, dates, airports, class, number of passeng
         
         logger.debug(f"Building prompt for message (length: {len(message)})")
         
+        # Trim message to reduce generation latency
+        message = (message or "")[:600]
+        
         # No conversation history - simple prompt
         if not conversation_history:
             return f"<s>[INST] <<SYS>>\n{system_prompt}\n<</SYS>>\n\n{message} [/INST]"
         
-        # Build prompt with conversation history (last 5 messages)
+        # Build prompt with conversation history (last 3 messages, truncated)
         prompt = f"<s>[INST] <<SYS>>\n{system_prompt}\n<</SYS>>\n\n"
         
-        for msg in conversation_history[-5:]:
+        for msg in conversation_history[-3:]:
             role = msg.get('role', 'user')
-            content = msg.get('content', '')
+            content = (msg.get('content', '') or '')[:400]
             
             if role == 'user':
                 prompt += f"{content} [/INST]"
@@ -365,8 +374,8 @@ class LlamaAIAssistant:
             'max_tokens': self.config.max_tokens if self.backend == ModelBackend.LLAMA_CPP else None,
             'max_new_tokens': None if self.backend == ModelBackend.LLAMA_CPP else self.config.max_tokens,
             'temperature': self.config.temperature,
-            'top_p': 0.8,
-            'top_k': 30,
+            'top_p': self.config.top_p,
+            'top_k': self.config.top_k,
             # Keep stop list minimal to avoid premature truncation
             'stop': ["</s>"],
         }
@@ -385,7 +394,7 @@ class LlamaAIAssistant:
                     top_p=generation_params['top_p'],
                     top_k=generation_params['top_k'],
                     stop=generation_params['stop'],
-                    repeat_penalty=1.2,
+                    repeat_penalty=self.config.repetition_penalty,
                     echo=False
                 )
                 result = response['choices'][0]['text'].strip()
@@ -399,7 +408,7 @@ class LlamaAIAssistant:
                     top_p=generation_params['top_p'],
                     top_k=generation_params['top_k'],
                     stop=generation_params['stop'],
-                    repetition_penalty=1.15
+                    repetition_penalty=self.config.repetition_penalty
                 )
                 result = response.strip()
             
