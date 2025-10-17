@@ -277,7 +277,7 @@ fabric.properties
 # Translations
 
 # Django stuff:
-
+model/
 # Flask stuff:
 
 # Scrapy stuff:
