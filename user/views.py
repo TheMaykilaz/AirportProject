@@ -25,6 +25,7 @@ from rest_framework import status
 import requests as http_requests
 from django.utils import timezone
 from datetime import timedelta
+from drf_spectacular.utils import extend_schema, OpenApiResponse
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -278,7 +279,6 @@ class LogoutView(APIView):
         except Exception:
             return Response({"message": "Failed to process refresh token."}, status=status.HTTP_400_BAD_REQUEST)
 
-
 class EmailTokenObtainPairView(TokenObtainPairView):
     serializer_class = EmailTokenObtainPairSerializer
 
@@ -286,6 +286,15 @@ class EmailTokenObtainPairView(TokenObtainPairView):
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        request=RegistrationSerializer,
+        responses={
+            201: OpenApiResponse(description='User created successfully'),
+            400: OpenApiResponse(description='Validation error'),
+        },
+        summary="Register a new user",
+        description="Create a new user account with email and password"
+    )
     def post(self, request):
         serializer = RegistrationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -300,7 +309,6 @@ class RegisterView(APIView):
 
 class ChangePasswordView(APIView):
     def post(self, request):
-        serializer = ChangePasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = request.user
         if not user.check_password(serializer.validated_data['old_password']):
@@ -340,6 +348,15 @@ class EmailLoginRequestView(APIView):
     """
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        request=EmailLoginRequestSerializer,
+        responses={
+            200: OpenApiResponse(description='Verification code sent'),
+            429: OpenApiResponse(description='Rate limit exceeded'),
+        },
+        summary="Request email verification code",
+        description="Send a verification code to the provided email address"
+    )
     def post(self, request):
         serializer = EmailLoginRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -362,20 +379,27 @@ class EmailLoginRequestView(APIView):
         # Generate and send verification code
         verification = EmailVerificationCode.generate_code(email, ip_address=ip_address)
         
-        # Send email
+        # Send email - in development mode, this will always succeed
         email_sent = send_verification_code(email, verification.code)
         
-        if not email_sent:
+        if not email_sent and not settings.DEBUG:
             return Response(
                 {"error": "Failed to send verification email. Please try again later."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         
-        return Response({
+        response_data = {
             "message": "Verification code sent to your email",
             "email": email,
             "expires_in_minutes": 10
-        })
+        }
+        
+        # In development mode, include the code in response for testing
+        if settings.DEBUG:
+            response_data["verification_code"] = verification.code
+            response_data["dev_note"] = "Code included for development testing only"
+        
+        return Response(response_data)
     
     @staticmethod
     def get_client_ip(request):
@@ -396,6 +420,15 @@ class EmailLoginVerifyView(APIView):
     """
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        request=EmailLoginVerifySerializer,
+        responses={
+            200: OpenApiResponse(description='Login successful, tokens returned'),
+            400: OpenApiResponse(description='Invalid or expired code'),
+        },
+        summary="Verify email code and login",
+        description="Verify the email verification code and receive JWT tokens"
+    )
     def post(self, request):
         serializer = EmailLoginVerifySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
