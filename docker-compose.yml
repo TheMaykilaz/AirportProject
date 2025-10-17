@@ -22,7 +22,11 @@ services:
     container_name: airport_web
     restart: unless-stopped
     # Use Daphne (ASGI) to support WebSockets via Django Channels
+<<<<<<< Updated upstream
     command: daphne -b 0.0.0.0 -p 8001 AirplaneDJ.asgi:application
+=======
+    command: daphne -b 0.0.0.0 -p 8000 AirplaneDJ.asgi:application
+>>>>>>> Stashed changes
     volumes:
       - static_volume:/app/staticfiles
     ports:
