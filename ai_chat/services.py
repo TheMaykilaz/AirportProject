@@ -259,7 +259,7 @@ class LlamaAIAssistant:
         self.model, self.backend = ModelLoader.load_model(self.config)
         logger.info(f"Model initialization complete. Backend: {self.backend.value}")
     
-    def generate_response(self, message: str, conversation_history: Optional[List[Dict]] = None) -> str:
+    def generate_response(self, message: str, conversation_history: Optional[List[Dict]] = None, user: Optional[Any] = None) -> str:
         """Generate AI response to user message."""
         conversation_history = conversation_history or []
         
@@ -268,6 +268,70 @@ class LlamaAIAssistant:
         
         # Generate flight context
         flight_context = FlightContextGenerator.generate(message)
+
+        # Safely enrich context with database facts (no raw SQL; ORM only)
+        try:
+            db_context_parts: List[str] = []
+            # Lazy import to avoid circular imports at module load
+            from django.utils import timezone as _tz
+            from airport.models import Airport, Flight
+            from bookings.models import Order
+
+            # Add top 3 airports matching tokens in the message
+            tokens = [t for t in re.findall(r"[a-zA-Z]{2,}", message or "")][:5]
+            if tokens:
+                airport_q = Airport.objects.all()
+                # Filter by code or city/name contains any token
+                from django.db.models import Q
+                q = Q()
+                for t in tokens:
+                    q |= Q(code__iexact=t) | Q(city__icontains=t) | Q(name__icontains=t)
+                airports = list(airport_q.filter(q).select_related("country").order_by("name")[:3])
+                if airports:
+                    db_context_parts.append("Known airports:")
+                    for ap in airports:
+                        db_context_parts.append(f"- {ap.name} ({ap.code}) in {ap.city}, {ap.country.code}")
+
+            # Add next 3 upcoming flights between hinted airports if both codes detected
+            codes = [t.upper() for t in tokens if len(t) in (3,)]
+            if len(codes) >= 2:
+                dep_code, arr_code = codes[0], codes[1]
+                now = _tz.now()
+                upcoming = (
+                    Flight.objects.select_related("airline", "departure_airport", "arrival_airport")
+                    .filter(
+                        departure_airport__code__iexact=dep_code,
+                        arrival_airport__code__iexact=arr_code,
+                        departure_time__gte=now,
+                    )
+                    .order_by("departure_time")[:3]
+                )
+                upcoming = list(upcoming)
+                if upcoming:
+                    db_context_parts.append("Upcoming flights:")
+                    for f in upcoming:
+                        db_context_parts.append(
+                            f"- {f.airline.code} {f.flight_number} {f.departure_airport.code}->{f.arrival_airport.code} at {f.departure_time:%Y-%m-%d %H:%M}"
+                        )
+
+            # If authenticated user, add last order summary (no sensitive PII)
+            if user and getattr(user, 'is_authenticated', False):
+                last_order = (
+                    Order.objects.select_related("flight__airline", "flight__departure_airport", "flight__arrival_airport")
+                    .filter(user=user)
+                    .order_by("-created_at")
+                    .first()
+                )
+                if last_order and getattr(last_order, 'flight', None):
+                    f = last_order.flight
+                    db_context_parts.append(
+                        f"Your last booking: {f.airline.code} {f.flight_number} {f.departure_airport.code}->{f.arrival_airport.code} on {f.departure_date} (status: {last_order.get_status_display()})."
+                    )
+
+            if db_context_parts:
+                flight_context = (flight_context + "\n" + "\n".join(db_context_parts)).strip()
+        except Exception as _e:
+            logger.debug(f"DB context enrichment skipped due to error: {_e}")
         
         # Build prompt
         prompt = PromptBuilder.build_prompt(message, conversation_history, flight_context)

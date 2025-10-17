@@ -14,6 +14,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
+        await self.send_json({"type": "ready", "message": "connected"})
 
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(self.group_name, self.channel_name)
@@ -40,17 +41,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
             # Generate AI response (run in thread to avoid blocking event loop)
             from asgiref.sync import sync_to_async
 
-            response = await sync_to_async(ai_assistant.generate_response)(message, history)
-
-            await self.channel_layer.group_send(
-                self.group_name,
-                {
-                    "type": "chat.ai_message",
-                    "response": response,
-                },
-            )
+            # Pass user for personalization and DB-backed context
+            response = await sync_to_async(ai_assistant.generate_response)(message, history, self.scope.get("user"))
+            # Send AI response only back to the sender, not the whole group
+            await self.send_json({
+                "type": "assistant",
+                "response": response,
+            })
+        except json.JSONDecodeError:
+            await self.send_json({"type": "error", "error": "Invalid JSON"})
         except Exception as e:
-            logger.error(f"WS receive error: {e}")
+            logger.error(f"WS receive error: {e}", exc_info=True)
             await self.send_json({"type": "error", "error": "Internal error"})
 
     async def chat_user_message(self, event):

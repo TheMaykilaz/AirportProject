@@ -22,6 +22,8 @@ class AIChat {
         this.settingsModal = document.getElementById('settingsModal');
         this.closeSettingsBtn = document.getElementById('closeSettings');
         this.typingIndicator = document.getElementById('typingIndicator');
+        this.statusText = document.querySelector('.status-text');
+        this.statusIndicator = document.querySelector('.status-indicator');
     }
 
     bindEvents() {
@@ -118,7 +120,8 @@ class AIChat {
             this.ws = new WebSocket(wsUrl);
 
             this.ws.onopen = () => {
-                // Connected
+                if (this.statusText) this.statusText.textContent = 'Connected';
+                if (this.statusIndicator) this.statusIndicator.style.background = '#22c55e';
             };
 
             this.ws.onmessage = (event) => {
@@ -137,12 +140,16 @@ class AIChat {
             };
 
             this.ws.onclose = () => {
+                if (this.statusText) this.statusText.textContent = 'Reconnecting...';
+                if (this.statusIndicator) this.statusIndicator.style.background = '#f59e0b';
                 // Try reconnect after delay
                 setTimeout(() => this.initWebSocket(), 2000);
             };
 
             this.ws.onerror = () => {
-                // Ignore, fallback will be used
+                if (this.statusText) this.statusText.textContent = 'Error';
+                if (this.statusIndicator) this.statusIndicator.style.background = '#ef4444';
+                // Fallback will be used
             };
         } catch (e) {
             // Ignore, fallback will be used
