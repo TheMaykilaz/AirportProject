@@ -6,9 +6,9 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_DB=airportdb
-      - POSTGRES_USER=airportuser
-      - POSTGRES_PASSWORD=airportpass123
+      - POSTGRES_DB=${DB_NAME:-airportdb}
+      - POSTGRES_USER=${DB_USER:-airportuser}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-airportpass123}
     ports:
       - "5432:5432"
     healthcheck:
@@ -22,40 +22,58 @@ services:
     container_name: airport_web
     restart: unless-stopped
     # Use Daphne (ASGI) to support WebSockets via Django Channels
-<<<<<<< Updated upstream
     command: daphne -b 0.0.0.0 -p 8001 AirplaneDJ.asgi:application
-=======
-    command: daphne -b 0.0.0.0 -p 8000 AirplaneDJ.asgi:application
->>>>>>> Stashed changes
     volumes:
       - static_volume:/app/staticfiles
     ports:
-      - "8000:8000"
+      - "8001:8001"
     environment:
-      - SECRET_KEY=django-insecure-docker-dev-key-change-in-production-12345
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-docker-dev-key-change-in-production-12345}
       - DEBUG=True
-      - DB_NAME=airportdb
-      - DB_USER=airportuser
-      - DB_PASSWORD=airportpass123
-      - DB_HOST=db
-      - DB_PORT=5432
+
+      # --- DATABASE ---
+      - DB_NAME=${DB_NAME:-airportdb}
+      - DB_USER=${DB_USER:-airportuser}
+      - DB_PASSWORD=${DB_PASSWORD:-airportpass123}
+      - DB_HOST=${DB_HOST:-db}
+      - DB_PORT=${DB_PORT:-5432}
+
+      # --- GOOGLE AUTH ---
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - "GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:8001/api/auth/google/callback/}"
+      - "GOOGLE_TOKEN_URL=${GOOGLE_TOKEN_URL:-https://oauth2.googleapis.com/token}"
+      - "GOOGLE_AUTHORIZATION_URL=${GOOGLE_AUTHORIZATION_URL:-https://accounts.google.com/o/oauth2/v2/auth}"
+      - "GOOGLE_USERINFO_URL=${GOOGLE_USERINFO_URL:-https://www.googleapis.com/oauth2/v2/userinfo}"
+
+      # --- STRIPE ---
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-sk_test_placeholder}
       - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY:-pk_test_placeholder}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
-      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:8000/api/auth/google/callback/}
-      - GOOGLE_TOKEN_URL=${GOOGLE_TOKEN_URL:-https://oauth2.googleapis.com/token}
-      - GOOGLE_AUTHORIZATION_URL=${GOOGLE_AUTHORIZATION_URL:-https://accounts.google.com/o/oauth2/v2/auth}
-      - GOOGLE_USERINFO_URL=${GOOGLE_USERINFO_URL:-https://www.googleapis.com/oauth2/v2/userinfo}
-      - EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
-      - EMAIL_HOST=smtp.gmail.com
-      - EMAIL_PORT=587
-      - EMAIL_USE_TLS=True
+
+      # --- EMAIL CONFIGURATION ---
+      - EMAIL_BACKEND=${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+      - EMAIL_HOST=${EMAIL_HOST:-smtp.gmail.com}
+      - EMAIL_PORT=${EMAIL_PORT:-587}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-True}
       - EMAIL_HOST_USER=${EMAIL_HOST_USER:-}
       - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-}
-      - DEFAULT_FROM_EMAIL=noreply@airplanedj.com
-      # Channels / Redis config
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-noreply@airplanedj.com}
+
+      # --- LLAMA / LOCAL MODEL SETTINGS ---
+      - LLAMA_MODEL_PATH=${LLAMA_MODEL_PATH:-}
+      - LLAMA_MODEL_TYPE=${LLAMA_MODEL_TYPE:-}
+      - LLAMA_API_BASE=${LLAMA_API_BASE:-}
+      - LLAMA_API_KEY=${LLAMA_API_KEY:-}
+      - LLAMA_MODEL_NAME=${LLAMA_MODEL_NAME:-}
+      - LLAMA_MAX_TOKENS=${LLAMA_MAX_TOKENS:-}
+      - LLAMA_TEMPERATURE=${LLAMA_TEMPERATURE:-}
+      - LLAMA_TOP_K=${LLAMA_TOP_K:-}
+      - LLAMA_TOP_P=${LLAMA_TOP_P:-}
+      - LLAMA_THREADS=${LLAMA_THREADS:-}
+      - LLAMA_CONTEXT_LENGTH=${LLAMA_CONTEXT_LENGTH:-}
+
+      # --- CHANNELS / REDIS CONFIG ---
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     depends_on:

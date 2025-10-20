@@ -1,0 +1,82 @@
+stages:
+  - build
+  - test
+  - deploy
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
+  IMAGE_NAME: $CI_REGISTRY_IMAGE
+  IMAGE_TAG: $CI_COMMIT_SHA
+
+# Build the Docker image
+build_image:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest .
+    - docker push $IMAGE_NAME:$IMAGE_TAG
+    - docker push $IMAGE_NAME:latest
+  only:
+    - main  # Build on pushes to main branch
+
+# Run tests
+run_tests:
+  stage: test
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker pull $IMAGE_NAME:latest
+    # Set up test environment (adjust based on your entrypoint.sh or test setup)
+    - docker run --rm -e DEBUG=True -e DB_NAME=test_db -e DB_USER=test_user -e DB_PASSWORD=test_pass -e DB_HOST=db $IMAGE_NAME:latest python manage.py test
+    # Alternatively, use docker-compose for full stack testing if needed
+    # - docker-compose -f docker-compose.test.yml up --abort-on-container-exit
+  dependencies:
+    - build_image
+  only:
+    - main
+
+# Deploy to staging (manual)
+deploy_staging:
+  stage: deploy
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - echo "Deploying to staging..."
+    # Example: Pull and run on a staging server (replace with your deployment method)
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker pull $IMAGE_NAME:latest
+    # Add commands to stop old containers, run new ones, e.g., via SSH or deployment tools
+    - echo "Staging deployment complete."
+  environment:
+    name: staging
+    url: https://staging.yourdomain.com  # Replace with your staging URL
+  when: manual
+  only:
+    - main
+
+# Deploy to production (manual)
+deploy_production:
+  stage: deploy
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - echo "Deploying to production..."
+    # Example: Similar to staging, but for production
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker pull $IMAGE_NAME:latest
+    # Add production deployment commands
+    - echo "Production deployment complete."
+  environment:
+    name: production
+    url: https://yourdomain.com  # Replace with your production URL
+  when: manual
+  only:
+    - main
