@@ -1,0 +1,78 @@
+# Ruff configuration for AirportProject
+# https://docs.astral.sh/ruff/
+
+# Exclude common directories
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "migrations",
+    "staticfiles",
+    "*.pyc",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+]
+
+# Set line length to match Django's default
+line-length = 120
+
+# Target Python 3.12
+target-version = "py312"
+
+[lint]
+# Enable recommended rules plus Django-specific ones
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "DJ",  # flake8-django
+    "PIE", # flake8-pie
+    "T20", # flake8-print
+    "SIM", # flake8-simplify
+]
+
+# Ignore specific rules
+ignore = [
+    "E501",   # Line too long (handled by formatter)
+    "B008",   # Do not perform function calls in argument defaults (common in Django)
+    "DJ001",  # Avoid using null=True on string-based fields
+    "T201",   # Print statements (useful for debugging)
+]
+
+# Allow autofix for all enabled rules
+fixable = ["ALL"]
+unfixable = []
+
+[lint.per-file-ignores]
+# Ignore specific rules in specific files
+"__init__.py" = ["F401"]  # Unused imports
+"settings.py" = ["E501"]  # Long lines in settings
+"*/migrations/*.py" = ["ALL"]  # Ignore all in migrations
+"manage.py" = ["T201"]  # Allow prints in manage.py
+"*/views.py" = ["F401"]  # Allow unused imports (may be re-exported in urls.py)
+"*/urls.py" = ["F401"]  # Allow unused imports in URL configs
+
+[lint.isort]
+# Configure import sorting
+known-first-party = ["user", "airport", "bookings", "stripe_payment", "AirplaneDJ"]
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+
+[format]
+# Use double quotes for strings
+quote-style = "double"
+
+# Indent with spaces
+indent-style = "space"
+
+# Respect magic trailing commas
+skip-magic-trailing-comma = false
+
+# Auto-detect line endings
+line-ending = "auto"

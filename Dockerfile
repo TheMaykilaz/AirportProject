@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     musl-dev \
     libpq-dev \
+    dos2unix \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies (ensure requirements.txt includes test packages like pytest or Django test tools)
@@ -32,6 +33,6 @@ EXPOSE 8001
 
 # Run entrypoint script (ensure entrypoint.sh can handle test runs if needed)
 COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+RUN dos2unix /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 ENTRYPOINT ["/app/entrypoint.sh"]
