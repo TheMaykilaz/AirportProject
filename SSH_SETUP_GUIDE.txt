@@ -1,0 +1,53 @@
+🗝️ MANUAL SSH KEY SETUP FOR AIRPORT PROJECT
+==============================================
+
+STEP 1: Generate SSH Key
+------------------------
+Open Command Prompt (cmd) and run:
+ssh-keygen -t rsa -b 4096 -C "airport-project-key" -f "C:\Users\Nadia\.ssh\id_rsa"
+
+Press Enter when prompted for:
+- File location (should default to C:\Users\Nadia\.ssh\id_rsa)
+- Passphrase (press Enter twice for no passphrase)
+
+STEP 2: Copy Your Public Key
+----------------------------
+Run this command to see your public key:
+type C:\Users\Nadia\.ssh\id_rsa.pub
+
+Copy the entire output (starts with "ssh-rsa" and ends with "airport-project-key")
+
+STEP 3: Add Key to GitHub
+-------------------------
+1. Go to: https://github.com/settings/ssh
+2. Click "New SSH key"
+3. Title: "Airport Project Key"
+4. Paste your public key in the "Key" field
+5. Click "Add SSH key"
+
+STEP 4: Update Git Remote
+-------------------------
+In your project directory, run:
+git remote set-url origin git@github.com:TheMaykilaz/AirportProject.git
+
+STEP 5: Test Connection
+-----------------------
+ssh -T git@github.com
+
+You should see: "Hi TheMaykilaz! You've successfully authenticated..."
+
+STEP 6: Push Your Code
+----------------------
+git push origin test-ci-pipeline
+
+This will trigger your CI/CD pipeline! 🚀
+
+ALTERNATIVE: Use HTTPS with Personal Access Token
+==================================================
+If SSH doesn't work, you can use a Personal Access Token:
+
+1. Go to: https://github.com/settings/tokens
+2. Generate new token (classic)
+3. Give it "repo" permissions
+4. Use as password when pushing:
+   git push https://YOUR_TOKEN@github.com/TheMaykilaz/AirportProject.git
