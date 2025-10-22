@@ -1,151 +1,159 @@
-stages:
-  - build
-  - lint
-  - test
-  - deploy
+name: Django CI/CD
 
-variables:
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
   DOCKER_DRIVER: overlay2
-  DOCKER_TLS_CERTDIR: ""
-  IMAGE_NAME: $CI_REGISTRY_IMAGE
-  IMAGE_TAG: $CI_COMMIT_SHA
+  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_TAG: ${{ github.sha }}
 
-# Build the Docker image
-build_image:
-  stage: build
-  image: docker:latest
-  services:
-    - docker:dind
-  script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker build -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest .
-    - docker push $IMAGE_NAME:$IMAGE_TAG
-    - docker push $IMAGE_NAME:latest
-  only:
-    - main  # Build on pushes to main branch
+jobs:
+  # ---------------------
+  # 🧱 Build Docker image
+  # ---------------------
+  build_image:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-# Lint code with Ruff
-ruff_lint:
-  stage: lint
-  image: python:3.12-slim
-  variables:
-    PIP_DISABLE_PIP_VERSION_CHECK: "1"
-    PIP_NO_CACHE_DIR: "1"
-  cache:
-    key: pip-lint-${CI_COMMIT_REF_SLUG}
-    paths:
-      - .cache/pip
-  before_script:
-    - pip install ruff==0.8.4
-  script:
-    - echo "Running Ruff linter..."
-    - ruff check . --output-format=gitlab || true
-    - echo "Running Ruff formatter check..."
-    - ruff format --check . || true
-    - echo "Linting complete (warnings only, not blocking)"
-  allow_failure: true
-  only:
-    - main
-    - merge_requests
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-# Run tests
-run_tests:
-  stage: test
-  image: python:3.12-slim
-  services:
-    - name: postgres:16-alpine
-      alias: db
-    - name: redis:7-alpine
-      alias: redis
-  variables:
-    # Django DB settings for tests
-    DB_NAME: test_db
-    DB_USER: test_user
-    DB_PASSWORD: test_pass
-    DB_HOST: db
-    DB_PORT: "5432"
-    # Postgres service env (must match the above)
-    POSTGRES_DB: test_db
-    POSTGRES_USER: test_user
-    POSTGRES_PASSWORD: test_pass
-    # Redis settings
-    REDIS_HOST: redis
-    REDIS_PORT: "6379"
-    # Django settings
-    SECRET_KEY: "test-secret-key-for-ci"
-    DEBUG: "True"
-    # Faster pip installs
-    PIP_DISABLE_PIP_VERSION_CHECK: "1"
-    PIP_NO_CACHE_DIR: "1"
-  cache:
-    key: pip-${CI_COMMIT_REF_SLUG}
-    paths:
-      - .cache/pip
-  before_script:
-    - python --version
-    - pip install --upgrade pip
-    - pip install -r requirements.txt
-    # Wait for Postgres to be ready
-    - python - <<'PY'
-from time import sleep
-import os, socket
-host, port = os.getenv("DB_HOST","db"), int(os.getenv("DB_PORT","5432"))
-for i in range(30):
-    try:
-        with socket.socket() as s:
-            s.settimeout(1.0)
-            s.connect((host, port))
-            print("DB is reachable")
-            break
-    except Exception:
-        print("Waiting for DB...")
-        sleep(2)
-else:
-    raise SystemExit("DB not reachable in time")
-PY
-  script:
-    - python manage.py migrate --noinput
-    - python manage.py test --parallel
-  only:
-    - main
-    - merge_requests
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-# Deploy to staging (manual)
-deploy_staging:
-  stage: deploy
-  image: docker:latest
-  services:
-    - docker:dind
-  script:
-    - echo "Deploying to staging..."
-    # Example: Pull and run on a staging server (replace with your deployment method)
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker pull $IMAGE_NAME:latest
-    # Add commands to stop old containers, run new ones, e.g., via SSH or deployment tools
-    - echo "Staging deployment complete."
-  environment:
-    name: staging
-    url: https://staging.yourdomain.com  # Replace with your staging URL
-  when: manual
-  only:
-    - main
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/${{ github.repository }}:latest
 
-# Deploy to production (manual)
-deploy_production:
-  stage: deploy
-  image: docker:latest
-  services:
-    - docker:dind
-  script:
-    - echo "Deploying to production..."
-    # Example: Similar to staging, but for production
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker pull $IMAGE_NAME:latest
-    # Add production deployment commands
-    - echo "Production deployment complete."
-  environment:
-    name: production
-    url: https://yourdomain.com  # Replace with your production URL
-  when: manual
-  only:
-    - main
+  # ---------------------
+  # 🔍 Lint with Ruff
+  # ---------------------
+  lint:
+    name: Ruff Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Ruff
+        run: pip install ruff==0.8.4
+      - name: Run Ruff Linter
+        run: |
+          ruff check . --output-format=github || true
+          ruff format --check . || true
+
+  # ---------------------
+  # 🧪 Run Tests
+  # ---------------------
+  test:
+    name: Run Django Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: test_db
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_pass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U test_user -d test_db"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    env:
+      DB_NAME: test_db
+      DB_USER: test_user
+      DB_PASSWORD: test_pass
+      DB_HOST: localhost
+      DB_PORT: 5432
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      SECRET_KEY: test-secret-key-for-ci
+      DEBUG: true
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Wait for DB to be ready
+        run: |
+          until pg_isready -h localhost -p 5432 -U test_user; do
+            echo "Waiting for Postgres..."
+            sleep 2
+          done
+          echo "Postgres is ready!"
+
+      - name: Run migrations and tests
+        run: |
+          python manage.py migrate --noinput
+          python manage.py test --parallel
+
+  # ---------------------
+  # 🚀 Deploy (manual)
+  # ---------------------
+  deploy_staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build_image, test]
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: staging
+      url: https://staging.yourdomain.com
+    steps:
+      - name: Deploy
+        run: |
+          echo "Deploying to staging..."
+          echo "Pulling Docker image and running on staging server..."
+          echo "Staging deployment complete."
+    # Manual approval step
+    concurrency:
+      group: staging
+      cancel-in-progress: false
+
+  deploy_production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build_image, test]
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://yourdomain.com
+    steps:
+      - name: Deploy
+        run: |
+          echo "Deploying to production..."
+          echo "Pulling Docker image and running on production server..."
+          echo "Production deployment complete."
