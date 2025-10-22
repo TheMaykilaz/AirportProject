@@ -1,0 +1,89 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="{% static 'ai_chat/css/chat.css' %}">
+</head>
+<body>
+    <div class="ai-chat-container">
+        <div class="chat-header">
+            <h1>AI Assistant</h1>
+            <div class="chat-status" id="chatStatus">
+                <span class="status-indicator"></span>
+                <span class="status-text">Ready</span>
+            </div>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+            <div class="message assistant-message">
+                <div class="message-avatar">AI</div>
+                <div class="message-content">
+                    <p>Hello! I'm your AI assistant powered by Llama. How can I help you today?</p>
+                </div>
+                <div class="message-time">{{ current_time|date:"H:i" }}</div>
+            </div>
+        </div>
+
+        <div class="chat-input-container">
+            <div class="typing-indicator" id="typingIndicator" style="display: none;">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+
+            <div class="chat-input-wrapper">
+                <textarea
+                    id="messageInput"
+                    placeholder="Type your message here..."
+                    rows="1"
+                    maxlength="1000"
+                ></textarea>
+                <button id="sendButton" type="button">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22,2 15,22 11,13 2,9"></polygon>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="chat-controls">
+                <button id="clearChat" class="control-btn secondary">
+                    Clear Chat
+                </button>
+                <button id="settingsBtn" class="control-btn secondary">
+                    Settings
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>AI Assistant Settings</h2>
+                <button class="modal-close" id="closeSettings">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-group">
+                    <label>Model:</label>
+                    <span id="modelName">{{ model_name|default:"Llama 2" }}</span>
+                </div>
+                <div class="settings-group">
+                    <label>Status:</label>
+                    <span id="modelStatus">Connected</span>
+                </div>
+                <div class="settings-group">
+                    <label>Max Tokens:</label>
+                    <span id="maxTokens">{{ max_tokens|default:"512" }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'ai_chat/js/chat.js' %}"></script>
+</body>
+</html>
