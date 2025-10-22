@@ -1,0 +1,151 @@
+stages:
+  - build
+  - lint
+  - test
+  - deploy
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
+  IMAGE_NAME: $CI_REGISTRY_IMAGE
+  IMAGE_TAG: $CI_COMMIT_SHA
+
+# Build the Docker image
+build_image:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest .
+    - docker push $IMAGE_NAME:$IMAGE_TAG
+    - docker push $IMAGE_NAME:latest
+  only:
+    - main  # Build on pushes to main branch
+
+# Lint code with Ruff
+ruff_lint:
+  stage: lint
+  image: python:3.12-slim
+  variables:
+    PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    PIP_NO_CACHE_DIR: "1"
+  cache:
+    key: pip-lint-${CI_COMMIT_REF_SLUG}
+    paths:
+      - .cache/pip
+  before_script:
+    - pip install ruff==0.8.4
+  script:
+    - echo "Running Ruff linter..."
+    - ruff check . --output-format=gitlab || true
+    - echo "Running Ruff formatter check..."
+    - ruff format --check . || true
+    - echo "Linting complete (warnings only, not blocking)"
+  allow_failure: true
+  only:
+    - main
+    - merge_requests
+
+# Run tests
+run_tests:
+  stage: test
+  image: python:3.12-slim
+  services:
+    - name: postgres:16-alpine
+      alias: db
+    - name: redis:7-alpine
+      alias: redis
+  variables:
+    # Django DB settings for tests
+    DB_NAME: test_db
+    DB_USER: test_user
+    DB_PASSWORD: test_pass
+    DB_HOST: db
+    DB_PORT: "5432"
+    # Postgres service env (must match the above)
+    POSTGRES_DB: test_db
+    POSTGRES_USER: test_user
+    POSTGRES_PASSWORD: test_pass
+    # Redis settings
+    REDIS_HOST: redis
+    REDIS_PORT: "6379"
+    # Django settings
+    SECRET_KEY: "test-secret-key-for-ci"
+    DEBUG: "True"
+    # Faster pip installs
+    PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    PIP_NO_CACHE_DIR: "1"
+  cache:
+    key: pip-${CI_COMMIT_REF_SLUG}
+    paths:
+      - .cache/pip
+  before_script:
+    - python --version
+    - pip install --upgrade pip
+    - pip install -r requirements.txt
+    # Wait for Postgres to be ready
+    - python - <<'PY'
+from time import sleep
+import os, socket
+host, port = os.getenv("DB_HOST","db"), int(os.getenv("DB_PORT","5432"))
+for i in range(30):
+    try:
+        with socket.socket() as s:
+            s.settimeout(1.0)
+            s.connect((host, port))
+            print("DB is reachable")
+            break
+    except Exception:
+        print("Waiting for DB...")
+        sleep(2)
+else:
+    raise SystemExit("DB not reachable in time")
+PY
+  script:
+    - python manage.py migrate --noinput
+    - python manage.py test --parallel
+  only:
+    - main
+    - merge_requests
+
+# Deploy to staging (manual)
+deploy_staging:
+  stage: deploy
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - echo "Deploying to staging..."
+    # Example: Pull and run on a staging server (replace with your deployment method)
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker pull $IMAGE_NAME:latest
+    # Add commands to stop old containers, run new ones, e.g., via SSH or deployment tools
+    - echo "Staging deployment complete."
+  environment:
+    name: staging
+    url: https://staging.yourdomain.com  # Replace with your staging URL
+  when: manual
+  only:
+    - main
+
+# Deploy to production (manual)
+deploy_production:
+  stage: deploy
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - echo "Deploying to production..."
+    # Example: Similar to staging, but for production
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker pull $IMAGE_NAME:latest
+    # Add production deployment commands
+    - echo "Production deployment complete."
+  environment:
+    name: production
+    url: https://yourdomain.com  # Replace with your production URL
+  when: manual
+  only:
+    - main
