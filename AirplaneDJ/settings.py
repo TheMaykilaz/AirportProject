@@ -41,7 +41,9 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'daphne',
     'django.contrib.staticfiles',
+    'channels',
     'user',
     'AirplaneDJ',
     'airport',
@@ -150,6 +152,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'AirplaneDJ.wsgi.application'
+ASGI_APPLICATION = 'AirplaneDJ.asgi.application'
 
 
 # Database
@@ -217,4 +220,11 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
     'COMPONENT_SPLIT_REQUEST': True,
     'SCHEMA_PATH_PREFIX': '/api/',
+}
+
+# Channels configuration
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    }
 }

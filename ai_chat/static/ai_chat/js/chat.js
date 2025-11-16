@@ -5,10 +5,12 @@ class AIChat {
         this.messages = [];
         this.isWaitingForResponse = false;
         this.conversationHistory = [];
+        this.ws = null;
 
         this.initializeElements();
         this.bindEvents();
         this.loadConversationHistory();
+        this.initWebSocket();
     }
 
     initializeElements() {
@@ -20,6 +22,8 @@ class AIChat {
         this.settingsModal = document.getElementById('settingsModal');
         this.closeSettingsBtn = document.getElementById('closeSettings');
         this.typingIndicator = document.getElementById('typingIndicator');
+        this.statusText = document.querySelector('.status-text');
+        this.statusIndicator = document.querySelector('.status-indicator');
     }
 
     bindEvents() {
@@ -84,14 +88,20 @@ class AIChat {
         this.setWaitingState(true);
 
         try {
-            // Send message to API
-            const response = await this.callChatAPI(message);
-
-            // Hide typing indicator
-            this.hideTypingIndicator();
-
-            // Add AI response to chat
-            this.addMessage('assistant', response);
+            // Prefer WebSocket if available
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                this.ws.send(JSON.stringify({
+                    message: message,
+                    conversation_history: this.conversationHistory.slice(-10)
+                }));
+            } else {
+                // Fallback to HTTP API
+                const response = await this.callChatAPI(message);
+                // Hide typing indicator
+                this.hideTypingIndicator();
+                // Add AI response to chat
+                this.addMessage('assistant', response);
+            }
 
         } catch (error) {
             console.error('Error sending message:', error);
@@ -99,6 +109,50 @@ class AIChat {
             this.addMessage('assistant', 'Sorry, I encountered an error. Please try again.');
         } finally {
             this.setWaitingState(false);
+        }
+    }
+
+    initWebSocket() {
+        try {
+            const loc = window.location;
+            const scheme = loc.protocol === 'https:' ? 'wss' : 'ws';
+            const wsUrl = `${scheme}://${loc.host}/ws/ai-chat/`;
+            this.ws = new WebSocket(wsUrl);
+
+            this.ws.onopen = () => {
+                if (this.statusText) this.statusText.textContent = 'Connected';
+                if (this.statusIndicator) this.statusIndicator.style.background = '#22c55e';
+            };
+
+            this.ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'assistant' && data.response) {
+                        this.hideTypingIndicator();
+                        this.addMessage('assistant', data.response);
+                        this.conversationHistory.push({ role: 'assistant', content: data.response });
+                    } else if (data.type === 'user' && data.message) {
+                        // Skip echoing our own last message
+                    }
+                } catch (e) {
+                    console.warn('Invalid WS message', e);
+                }
+            };
+
+            this.ws.onclose = () => {
+                if (this.statusText) this.statusText.textContent = 'Reconnecting...';
+                if (this.statusIndicator) this.statusIndicator.style.background = '#f59e0b';
+                // Try reconnect after delay
+                setTimeout(() => this.initWebSocket(), 2000);
+            };
+
+            this.ws.onerror = () => {
+                if (this.statusText) this.statusText.textContent = 'Error';
+                if (this.statusIndicator) this.statusIndicator.style.background = '#ef4444';
+                // Fallback will be used
+            };
+        } catch (e) {
+            // Ignore, fallback will be used
         }
     }
 

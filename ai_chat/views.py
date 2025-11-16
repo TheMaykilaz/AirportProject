@@ -86,7 +86,7 @@ def ai_chat_api(request: HttpRequest) -> JsonResponse:
         logger.info(f"Processing chat message (length: {len(message)}, history: {len(conversation_history)})")
         
         # Generate AI response
-        response = ai_assistant.generate_response(message, conversation_history)
+        response = ai_assistant.generate_response(message, conversation_history, request.user)
         
         logger.info("Chat response generated successfully")
         return success_response({'response': response})
