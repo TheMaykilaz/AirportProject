@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from datetime import timedelta
@@ -37,7 +38,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             "status": order.status
         })
 
-    @action(detail=False, methods=["post"], permission_classes=[])
+    @action(detail=False, methods=["post"], permission_classes=[IsAuthenticated])
     def create_with_tickets(self, request):
         """Create an order and book tickets in one operation"""
         from .services import BookingService
@@ -47,7 +48,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         flight = serializer.validated_data['flight_id']
         seat_numbers = serializer.validated_data.get('seat_numbers', [])
-        user = request.user if request.user.is_authenticated else None
+        user = request.user
 
         try:
             order = BookingService.create_booking(user, flight, seat_numbers)

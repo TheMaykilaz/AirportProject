@@ -3,6 +3,94 @@
 from django.db import migrations, models
 
 
+def generate_unique_airline_codes(apps, schema_editor):
+    """Generate unique codes for all airlines"""
+    Airline = apps.get_model('airport', 'Airline')
+    used_codes = set()
+    
+    for airline in Airline.objects.all():
+        # Generate code from name
+        code = generate_code_from_name(airline.name, used_codes)
+        used_codes.add(code)
+        airline.code = code
+        airline.save()
+
+
+def generate_code_from_name(name, used_codes):
+    """Generate a unique airline code from the name"""
+    # Try first 3 letters
+    if len(name) >= 3:
+        base_code = name[:3].upper().replace(' ', '')
+        base_code = ''.join(c for c in base_code if c.isalpha())[:3]
+        
+        if len(base_code) == 3 and base_code not in used_codes:
+            return base_code
+    
+    # Try first letter of each word
+    words = name.split()
+    if len(words) >= 2:
+        code = ''.join(w[0].upper() for w in words[:3])[:3]
+        if len(code) == 3 and code not in used_codes:
+            return code
+    
+    # Fallback: use counter
+    counter = 1
+    while True:
+        new_code = f"AL{counter}"[:3]
+        if new_code not in used_codes:
+            return new_code
+        counter += 1
+        if counter > 999:
+            break
+    
+    # Last resort: use airline ID
+    return f"A{len(used_codes) + 1:02d}"[:3]
+
+
+def generate_unique_airplane_registrations(apps, schema_editor):
+    """Generate unique registrations for all airplanes"""
+    Airplane = apps.get_model('airport', 'Airplane')
+    used_registrations = set()
+    counter = 1
+    
+    for airplane in Airplane.objects.all():
+        # Generate registration
+        reg = f"N{airplane.id:05d}"[:10] if airplane.id else f"N{counter:05d}"[:10]
+        while reg in used_registrations:
+            counter += 1
+            reg = f"N{counter:05d}"[:10]
+        
+        used_registrations.add(reg)
+        airplane.registration = reg
+        airplane.save()
+        counter += 1
+
+
+def fix_country_codes(apps, schema_editor):
+    """Generate unique codes for all countries"""
+    Country = apps.get_model('airport', 'Country')
+    used_codes = set()
+    
+    for country in Country.objects.all():
+        # Generate code from name (first 2 letters)
+        code = country.name[:2].upper().replace(' ', '')
+        code = ''.join(c for c in code if c.isalpha())[:2]
+        
+        if len(code) < 2:
+            code = f"C{country.id}"[:2]
+        
+        # Ensure uniqueness
+        original_code = code
+        counter = 1
+        while code in used_codes:
+            code = f"{original_code[0]}{counter}"[:2]
+            counter += 1
+        
+        used_codes.add(code)
+        country.code = code
+        country.save()
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -10,15 +98,71 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='airline',
-            name='code',
-            field=models.CharField(default='XXX', help_text='IATA airline code (e.g., AA, BA)', max_length=3, unique=True),
+        # Add field without unique constraint first (only if it doesn't exist)
+        migrations.RunSQL(
+            sql="ALTER TABLE airport_airline ADD COLUMN IF NOT EXISTS code VARCHAR(3) DEFAULT 'XXX';",
+            reverse_sql="ALTER TABLE airport_airline DROP COLUMN IF EXISTS code;",
         ),
-        migrations.AddField(
-            model_name='airplane',
-            name='registration',
-            field=models.CharField(default='N000XX', help_text='Aircraft registration (e.g., N123AA)', max_length=10, unique=True),
+        # Populate unique codes
+        migrations.RunPython(generate_unique_airline_codes, migrations.RunPython.noop),
+        # Now add unique constraint
+        migrations.RunSQL(
+            sql="""
+                DO $$ 
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint 
+                        WHERE conname = 'airport_airline_code_key'
+                    ) THEN
+                        ALTER TABLE airport_airline ADD CONSTRAINT airport_airline_code_key UNIQUE (code);
+                    END IF;
+                END $$;
+            """,
+            reverse_sql="ALTER TABLE airport_airline DROP CONSTRAINT IF EXISTS airport_airline_code_key;",
+        ),
+        # Add airplane registration field (only if it doesn't exist)
+        migrations.RunSQL(
+            sql="ALTER TABLE airport_airplane ADD COLUMN IF NOT EXISTS registration VARCHAR(10) DEFAULT 'N000XX';",
+            reverse_sql="ALTER TABLE airport_airplane DROP COLUMN IF EXISTS registration;",
+        ),
+        # Update Django's state to know about the field
+        migrations.SeparateDatabaseAndState(
+            database_operations=[],
+            state_operations=[
+                migrations.AddField(
+                    model_name='airplane',
+                    name='registration',
+                    field=models.CharField(default='N000XX', help_text='Aircraft registration (e.g., N123AA)', max_length=10),
+                ),
+            ],
+        ),
+        # Populate unique registrations
+        migrations.RunPython(generate_unique_airplane_registrations, migrations.RunPython.noop),
+        # Now add unique constraint
+        migrations.RunSQL(
+            sql="""
+                DO $$ 
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint 
+                        WHERE conname = 'airport_airplane_registration_key'
+                    ) THEN
+                        ALTER TABLE airport_airplane ADD CONSTRAINT airport_airplane_registration_key UNIQUE (registration);
+                    END IF;
+                END $$;
+            """,
+            reverse_sql="ALTER TABLE airport_airplane DROP CONSTRAINT IF EXISTS airport_airplane_registration_key;",
+        ),
+        # Update Django's state for unique constraint
+        migrations.SeparateDatabaseAndState(
+            database_operations=[],
+            state_operations=[
+                migrations.AlterField(
+                    model_name='airplane',
+                    name='registration',
+                    field=models.CharField(default='N000XX', help_text='Aircraft registration (e.g., N123AA)', max_length=10, unique=True),
+                ),
+            ],
         ),
         migrations.AddField(
             model_name='airport',
@@ -30,10 +174,30 @@ class Migration(migrations.Migration):
             name='timezone',
             field=models.CharField(default='UTC', help_text='Airport timezone (e.g., America/New_York)', max_length=50),
         ),
-        migrations.AddField(
-            model_name='country',
-            name='code',
-            field=models.CharField(default='XX', help_text='ISO 3166-1 alpha-2 code (e.g., US, GB)', max_length=2, unique=True),
+        # Add country code field (only if it doesn't exist)
+        migrations.RunSQL(
+            sql="ALTER TABLE airport_country ADD COLUMN IF NOT EXISTS code VARCHAR(2) DEFAULT 'XX';",
+            reverse_sql="ALTER TABLE airport_country DROP COLUMN IF EXISTS code;",
+        ),
+        # Populate unique country codes
+        migrations.RunPython(
+            lambda apps, schema_editor: fix_country_codes(apps, schema_editor),
+            migrations.RunPython.noop
+        ),
+        # Add unique constraint for country code
+        migrations.RunSQL(
+            sql="""
+                DO $$ 
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint 
+                        WHERE conname = 'airport_country_code_key'
+                    ) THEN
+                        ALTER TABLE airport_country ADD CONSTRAINT airport_country_code_key UNIQUE (code);
+                    END IF;
+                END $$;
+            """,
+            reverse_sql="ALTER TABLE airport_country DROP CONSTRAINT IF EXISTS airport_country_code_key;",
         ),
         migrations.AddField(
             model_name='flight',

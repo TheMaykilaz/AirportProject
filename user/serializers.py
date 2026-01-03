@@ -3,6 +3,7 @@ from .models import User, UserProfile, EmailVerificationCode, LoginAttempt
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework import serializers as drf_serializers
 from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
+from django.db import IntegrityError
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -141,10 +142,32 @@ class RegistrationSerializer(serializers.ModelSerializer):
             "last_name",
         )
 
+    def validate_email(self, value):
+        """Validate that email is unique"""
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value.lower()
+
+    def validate_username(self, value):
+        """Validate that username is unique"""
+        if User.objects.filter(username__iexact=value).exists():
+            raise serializers.ValidationError("A user with this username already exists.")
+        return value
+
     def create(self, validated_data):
         password = validated_data.pop("password")
-        user = User.objects.create_user(**validated_data, password=password)
-        return user
+        try:
+            user = User.objects.create_user(**validated_data, password=password)
+            return user
+        except IntegrityError as e:
+            # Fallback: catch any database-level integrity errors
+            error_msg = str(e)
+            if 'email' in error_msg.lower():
+                raise serializers.ValidationError({"email": "A user with this email already exists."})
+            elif 'username' in error_msg.lower():
+                raise serializers.ValidationError({"username": "A user with this username already exists."})
+            else:
+                raise serializers.ValidationError("Unable to create user. Please check your input.")
 
 
 class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):

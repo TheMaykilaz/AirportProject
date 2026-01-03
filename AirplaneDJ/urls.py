@@ -2,12 +2,16 @@
 
 from django.contrib import admin
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
-from django.urls import path, include
+from django.urls import path, include, re_path
+from django.views.static import serve
+from django.conf import settings
+from django.conf.urls.static import static
 from user.views import  GoogleLoginView, GoogleCallbackView, AuthTestPageView, LogoutView
 from rest_framework_simplejwt.views import (
         TokenObtainPairView,
         TokenRefreshView,
     )
+from .views import ReactAppView
 
 
 
@@ -34,5 +38,13 @@ urlpatterns = [
     path("redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
     path("auth/test/", AuthTestPageView.as_view(), name="auth-test"),
     path("logout/", LogoutView.as_view(), name="logout"),
+    
+    # React app - catch all routes and serve React app
+    # This should be last to catch all non-API routes
+    re_path(r'^(?!api|admin|swagger|redoc|auth|logout).*$', ReactAppView.as_view(), name='react-app'),
 ]
+
+# Serve static files in development
+if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 

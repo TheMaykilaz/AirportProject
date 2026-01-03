@@ -3,6 +3,7 @@ from django.contrib.auth.models import AbstractUser, UserManager as DjangoUserMa
 from django.core.validators import RegexValidator
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.db.utils import ProgrammingError, OperationalError
 from datetime import timedelta, date
 import secrets
 
@@ -169,14 +170,28 @@ class User(AbstractUser):
 
     def get_booking_count(self):
         """Get total number of bookings made by user"""
-        return self.orders.count()
+        try:
+            return self.orders.count()
+        except (ProgrammingError, OperationalError):
+            # Handle case where bookings_order table doesn't exist or other DB errors
+            return 0
+        except Exception:
+            # Fallback for any other unexpected errors
+            return 0
 
     def get_completed_flights(self):
         """Get number of completed flights"""
-        return self.orders.filter(
-            status='confirmed',
-            tickets__status='completed'
-        ).distinct().count()
+        try:
+            return self.orders.filter(
+                status='confirmed',
+                tickets__status='completed'
+            ).distinct().count()
+        except (ProgrammingError, OperationalError):
+            # Handle case where bookings_order table doesn't exist or other DB errors
+            return 0
+        except Exception:
+            # Fallback for any other unexpected errors
+            return 0
 
     def can_book_flights(self):
         """Check if user can book flights (has required info)"""

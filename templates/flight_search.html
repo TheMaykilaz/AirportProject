@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flight Search - Find Cheap Airline Tickets</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .search-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            margin-bottom: 30px;
+        }
+
+        .search-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group select {
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .search-btn {
+            grid-column: 1 / -1;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .search-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .search-btn:active {
+            transform: translateY(0);
+        }
+
+        .results-container {
+            display: none;
+        }
+
+        .results-header {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .results-header h2 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .price-stats {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .flight-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+
+        .flight-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .flight-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .airline-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .airline-logo {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 18px;
+        }
+
+        .airline-name {
+            font-weight: 600;
+            font-size: 1.1em;
+            color: #333;
+        }
+
+        .flight-number {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .price-section {
+            text-align: right;
+        }
+
+        .price {
+            font-size: 2em;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .price-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .flight-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .detail-label {
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .detail-value {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .book-btn {
+            margin-top: 20px;
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .book-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+            font-size: 1.2em;
+        }
+
+        .error {
+            background: #ff6b6b;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            background: white;
+            border-radius: 15px;
+        }
+
+        .round-trip-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 26px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #667eea;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✈️ Flight Search</h1>
+            <p>Find and compare the cheapest airline tickets from different airlines</p>
+        </div>
+
+        <div class="search-card">
+            <form id="searchForm" class="search-form">
+                <div class="round-trip-toggle">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="roundTrip">
+                        <span class="slider"></span>
+                    </label>
+                    <label for="roundTrip" style="font-weight: 600; color: #333;">Round Trip</label>
+                </div>
+
+                <div class="form-group">
+                    <label for="departure_airport">Departure Airport Code</label>
+                    <input type="text" id="departure_airport" name="departure_airport_code" placeholder="e.g., JFK" maxlength="3" style="text-transform: uppercase;">
+                </div>
+
+                <div class="form-group">
+                    <label for="arrival_airport">Arrival Airport Code</label>
+                    <input type="text" id="arrival_airport" name="arrival_airport_code" placeholder="e.g., LHR" maxlength="3" style="text-transform: uppercase;">
+                </div>
+
+                <div class="form-group">
+                    <label for="departure_date">Departure Date</label>
+                    <input type="date" id="departure_date" name="departure_date" required>
+                </div>
+
+                <div class="form-group" id="returnDateGroup" style="display: none;">
+                    <label for="return_date">Return Date</label>
+                    <input type="date" id="return_date" name="return_date">
+                </div>
+
+                <div class="form-group">
+                    <label for="passengers">Passengers</label>
+                    <input type="number" id="passengers" name="passengers" min="1" max="9" value="1">
+                </div>
+
+                <div class="form-group">
+                    <label for="sort_by">Sort By</label>
+                    <select id="sort_by" name="sort_by">
+                        <option value="price">Price (Lowest First)</option>
+                        <option value="duration">Duration (Shortest First)</option>
+                        <option value="departure_time">Departure Time</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="search-btn">🔍 Search Flights</button>
+            </form>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            Searching for flights...
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="results" class="results-container">
+            <div class="results-header">
+                <h2>Search Results</h2>
+                <div class="price-stats" id="priceStats"></div>
+            </div>
+            <div id="resultsList"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = '/api/airport/flights';
+        const BOOKINGS_API_URL = '/api/bookings/orders';
+        const PAYMENTS_API_URL = '/api/payments/payments';
+
+        // Set minimum date to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('departure_date').min = today;
+        document.getElementById('return_date').min = today;
+
+        // Toggle return date field
+        document.getElementById('roundTrip').addEventListener('change', function() {
+            const returnDateGroup = document.getElementById('returnDateGroup');
+            if (this.checked) {
+                returnDateGroup.style.display = 'block';
+                document.getElementById('return_date').required = true;
+            } else {
+                returnDateGroup.style.display = 'none';
+                document.getElementById('return_date').required = false;
+            }
+        });
+
+        // Handle form submission
+        document.getElementById('searchForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const params = new URLSearchParams();
+            
+            // Build query parameters
+            for (const [key, value] of formData.entries()) {
+                if (value && value.trim()) {
+                    params.append(key, value.trim());
+                }
+            }
+
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('results').style.display = 'none';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/search/?${params.toString()}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Search failed');
+                }
+
+                displayResults(data);
+            } catch (error) {
+                document.getElementById('error').textContent = error.message;
+                document.getElementById('error').style.display = 'block';
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        });
+
+        function displayResults(data) {
+            const resultsContainer = document.getElementById('results');
+            const resultsList = document.getElementById('resultsList');
+            const priceStats = document.getElementById('priceStats');
+
+            resultsList.innerHTML = '';
+
+            if (data.total_count === 0) {
+                resultsList.innerHTML = '<div class="no-results"><h3>No flights found</h3><p>Try adjusting your search criteria</p></div>';
+                resultsContainer.style.display = 'block';
+                return;
+            }
+
+            // Display price statistics
+            if (data.price_stats) {
+                priceStats.innerHTML = `
+                    <div class="stat-item">
+                        <span class="stat-label">Cheapest</span>
+                        <span class="stat-value">$${parseFloat(data.price_stats.min).toFixed(2)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Most Expensive</span>
+                        <span class="stat-value">$${parseFloat(data.price_stats.max).toFixed(2)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Average</span>
+                        <span class="stat-value">$${parseFloat(data.price_stats.average).toFixed(2)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Flights</span>
+                        <span class="stat-value">${data.total_count}</span>
+                    </div>
+                `;
+            }
+
+            // Display flight results
+            data.results.forEach(flight => {
+                const flightCard = createFlightCard(flight, false);
+                resultsList.appendChild(flightCard);
+            });
+
+            // Display return flights if any
+            if (data.return_results && data.return_results.length > 0) {
+                const returnHeader = document.createElement('h2');
+                returnHeader.textContent = 'Return Flights';
+                returnHeader.style.marginTop = '30px';
+                returnHeader.style.marginBottom = '20px';
+                returnHeader.style.color = '#333';
+                resultsList.appendChild(returnHeader);
+
+                data.return_results.forEach(flight => {
+                    const flightCard = createFlightCard(flight, true);
+                    resultsList.appendChild(flightCard);
+                });
+            }
+
+            resultsContainer.style.display = 'block';
+        }
+
+        function createFlightCard(flight, isReturn) {
+            const card = document.createElement('div');
+            card.className = 'flight-card';
+            
+            const departureTime = new Date(flight.departure_time);
+            const arrivalTime = new Date(flight.arrival_time);
+
+            card.innerHTML = `
+                <div class="flight-header">
+                    <div class="airline-info">
+                        <div class="airline-logo">${flight.airline_code}</div>
+                        <div>
+                            <div class="airline-name">${flight.airline_name}</div>
+                            <div class="flight-number">${flight.flight_number}</div>
+                        </div>
+                    </div>
+                    <div class="price-section">
+                        <div class="price">$${parseFloat(flight.min_price).toFixed(2)}</div>
+                        <div class="price-label">per person</div>
+                    </div>
+                </div>
+                <div class="flight-details">
+                    <div class="detail-item">
+                        <span class="detail-label">Departure</span>
+                        <span class="detail-value">${departureTime.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'})}</span>
+                        <span style="color: #666; font-size: 0.9em;">${flight.departure_airport_code} - ${flight.departure_city}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Arrival</span>
+                        <span class="detail-value">${arrivalTime.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'})}</span>
+                        <span style="color: #666; font-size: 0.9em;">${flight.arrival_airport_code} - ${flight.arrival_city}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Duration</span>
+                        <span class="detail-value">${flight.duration_formatted}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Available Seats</span>
+                        <span class="detail-value">${flight.available_seats}</span>
+                    </div>
+                </div>
+                <button class="book-btn" onclick="bookFlight(${flight.flight_id}, ${isReturn})">Book Now</button>
+            `;
+
+            return card;
+        }
+
+        async function bookFlight(flightId, isReturn) {
+            if (!confirm('Do you want to proceed with booking this flight?')) {
+                return;
+            }
+
+            // Get authentication token (you may need to adjust this based on your auth setup)
+            const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
+            
+            if (!token) {
+                alert('Please log in to book a flight');
+                window.location.href = '/api/token/';
+                return;
+            }
+
+            try {
+                // Get seat map first
+                const seatResponse = await fetch(`${API_BASE_URL}/${flightId}/seat_map/`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                const seatData = await seatResponse.json();
+
+                // For simplicity, we'll book the first available seat
+                // In a real app, you'd let the user select a seat
+                const availableSeats = seatData.seat_map.filter(s => s.status === 'available');
+                if (availableSeats.length === 0) {
+                    alert('No available seats');
+                    return;
+                }
+
+                const seatNumber = availableSeats[0].seat_number;
+
+                // Create booking
+                const bookingResponse = await fetch(`${BOOKINGS_API_URL}/create_with_tickets/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        flight_id: flightId,
+                        seat_numbers: [seatNumber]
+                    })
+                });
+
+                const bookingData = await bookingResponse.json();
+
+                if (!bookingResponse.ok) {
+                    throw new Error(bookingData.error || 'Booking failed');
+                }
+
+                // Create payment
+                const paymentResponse = await fetch(`${PAYMENTS_API_URL}/create_checkout_session/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        order: bookingData.order_id
+                    })
+                });
+
+                const paymentData = await paymentResponse.json();
+
+                if (!paymentResponse.ok) {
+                    throw new Error(paymentData.error || 'Payment setup failed');
+                }
+
+                // Redirect to Stripe Checkout
+                if (paymentData.checkout_url) {
+                    window.location.href = paymentData.checkout_url;
+                } else {
+                    alert('Booking created! Order ID: ' + bookingData.order_id);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
+

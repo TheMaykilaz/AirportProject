@@ -8,6 +8,7 @@ from .views import (
     AirplaneViewSet,
     FlightViewSet,
     FlightSeatViewSet,
+    FlightSearchPageView,
 )
 
 router = DefaultRouter()
@@ -20,4 +21,5 @@ router.register(r"seats", FlightSeatViewSet, basename="flightseat")
 
 urlpatterns = [
     path("", include(router.urls)),
+    path("search/", FlightSearchPageView.as_view(), name="flight-search-page"),
 ]

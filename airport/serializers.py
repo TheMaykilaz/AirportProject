@@ -118,3 +118,36 @@ class FlightSerializer(serializers.ModelSerializer):
             "actual_arrival",
             "flight_seats",
         ]
+
+
+class FlightSearchResultSerializer(serializers.Serializer):
+    """Serializer for flight search results with pricing information"""
+    flight_id = serializers.IntegerField()
+    flight_number = serializers.CharField()
+    airline_name = serializers.CharField()
+    airline_code = serializers.CharField()
+    departure_airport_code = serializers.CharField()
+    departure_airport_name = serializers.CharField()
+    departure_city = serializers.CharField()
+    arrival_airport_code = serializers.CharField()
+    arrival_airport_name = serializers.CharField()
+    arrival_city = serializers.CharField()
+    departure_time = serializers.DateTimeField()
+    arrival_time = serializers.DateTimeField()
+    duration_hours = serializers.FloatField(allow_null=True)
+    duration_formatted = serializers.CharField()
+    min_price = serializers.DecimalField(max_digits=12, decimal_places=2)
+    max_price = serializers.DecimalField(max_digits=12, decimal_places=2)
+    base_price = serializers.DecimalField(max_digits=12, decimal_places=2)
+    available_seats = serializers.IntegerField()
+    status = serializers.CharField()
+    airplane_model = serializers.CharField()
+
+
+class FlightSearchResponseSerializer(serializers.Serializer):
+    """Serializer for complete search response"""
+    results = FlightSearchResultSerializer(many=True)
+    return_results = FlightSearchResultSerializer(many=True, required=False)
+    total_count = serializers.IntegerField()
+    price_stats = serializers.DictField(required=False, allow_null=True)
+    search_params = serializers.DictField()

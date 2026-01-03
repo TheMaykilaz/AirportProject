@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Airport Project - Flight Booking</title>
+    {% load static %}
+    {% if react_built %}
+        <!-- Production: Serve built React app -->
+        <link rel="stylesheet" href="{% static 'react/assets/index.css' %}">
+    {% else %}
+        <!-- Development: React dev server will inject styles -->
+        <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap"
+        />
+        <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/icon?family=Material+Icons"
+        />
+    {% endif %}
+</head>
+<body>
+    <div id="root"></div>
+    {% if react_built %}
+        <!-- Production: Load built React app -->
+        <script type="module" src="{% static 'react/assets/index.js' %}"></script>
+    {% else %}
+        <!-- Development: Point to React dev server -->
+        <script>
+            // In development, React dev server runs on port 5173
+            // This is handled by Vite's proxy or you can access directly
+            console.log('React app should be running on http://localhost:5173');
+        </script>
+    {% endif %}
+</body>
+</html>
+
