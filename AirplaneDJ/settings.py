@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'AirplaneDJ',
     'airport',
     'bookings',
+    'hotels',
     'ai_chat',
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',

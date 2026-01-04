@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search cheap flight tickets</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0b57d0;
+            min-height: 100vh;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        .title {
+            text-align: center;
+            color: white;
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 40px;
+        }
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 0;
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 4px;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .tab {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            color: #87ceeb;
+            cursor: pointer;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        .tab.active {
+            background: white;
+            color: #0b57d0;
+        }
+        .tab-icon {
+            font-size: 20px;
+        }
+        .search-form-container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        .search-form {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .form-field {
+            flex: 1;
+            min-width: 150px;
+            position: relative;
+        }
+        .form-field.departure, .form-field.arrival {
+            flex: 1.2;
+        }
+        .form-field.dates {
+            flex: 0.9;
+        }
+        .form-field.passengers {
+            flex: 0.8;
+        }
+        .form-field label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+        .form-field input, .form-field select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
+            background: white;
+        }
+        .form-field input:focus, .form-field select:focus {
+            outline: none;
+            border-color: #0b57d0;
+        }
+        .airport-code {
+            font-size: 12px;
+            color: #999;
+            margin-top: 2px;
+        }
+        .swap-button {
+            background: #f0f0f0;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: all 0.2s;
+            margin-top: 20px;
+        }
+        .swap-button:hover {
+            background: #e0e0e0;
+        }
+        .date-clear {
+            position: absolute;
+            right: 8px;
+            top: 32px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            color: #999;
+            padding: 4px;
+        }
+        .date-clear:hover {
+            color: #333;
+        }
+        .passenger-dropdown {
+            position: relative;
+        }
+        .passenger-display {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            background: white;
+        }
+        .passenger-info {
+            display: flex;
+            flex-direction: column;
+        }
+        .passenger-count {
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
+        }
+        .passenger-class {
+            font-size: 12px;
+            color: #666;
+        }
+        .dropdown-arrow {
+            color: #999;
+        }
+        .multi-city-link {
+            color: #0b57d0;
+            text-decoration: none;
+            font-size: 14px;
+            margin-top: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .multi-city-link:hover {
+            text-decoration: underline;
+        }
+        .search-button-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 20px;
+        }
+        .search-button {
+            background: #ff6b35;
+            color: white;
+            border: none;
+            padding: 16px 48px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .search-button:hover {
+            background: #e55a2b;
+        }
+        .booking-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .booking-checkbox input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        .booking-checkbox label {
+            font-size: 14px;
+            color: #666;
+            cursor: pointer;
+        }
+        @media (max-width: 768px) {
+            .search-form {
+                flex-direction: column;
+            }
+            .form-field {
+                width: 100%;
+            }
+            .swap-button {
+                transform: rotate(90deg);
+                margin: 10px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">Search cheap flight tickets</h1>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('flights')">
+                <span class="tab-icon">✈️</span>
+                <span>Flights</span>
+            </button>
+            <button class="tab" onclick="switchTab('hotels')">
+                <span class="tab-icon">🏨</span>
+                <span>Hotels</span>
+            </button>
+            <button class="tab" onclick="switchTab('favorites')">
+                <span class="tab-icon">❤️</span>
+                <span>Favorites</span>
+            </button>
+        </div>
+
+        <div class="search-form-container">
+            <form id="flightSearchForm" class="search-form" onsubmit="handleSearch(event)">
+                <div class="form-field departure">
+                    <label>From</label>
+                    <input type="text" id="departure_city" name="departure_city" placeholder="City or airport" 
+                           value="{{ request.GET.departure_city|default:'' }}" autocomplete="off">
+                    <div class="airport-code" id="departure_code"></div>
+                </div>
+                
+                <button type="button" class="swap-button" onclick="swapAirports()" title="Swap airports">⇄</button>
+                
+                <div class="form-field arrival">
+                    <label>To</label>
+                    <input type="text" id="arrival_city" name="arrival_city" placeholder="City or airport" 
+                           value="{{ request.GET.arrival_city|default:'' }}" autocomplete="off">
+                    <div class="airport-code" id="arrival_code"></div>
+                </div>
+                
+                <div class="form-field dates">
+                    <label>Departure</label>
+                    <div style="position: relative;">
+                        <input type="date" id="departure_date" name="departure_date" 
+                               value="{{ request.GET.departure_date|default:'' }}" required>
+                        <button type="button" class="date-clear" onclick="clearDate('departure_date')" title="Clear">×</button>
+                    </div>
+                </div>
+                
+                <div class="form-field dates">
+                    <label>Return</label>
+                    <div style="position: relative;">
+                        <input type="date" id="return_date" name="return_date" 
+                               value="{{ request.GET.return_date|default:'' }}">
+                        <button type="button" class="date-clear" onclick="clearDate('return_date')" title="Clear">×</button>
+                    </div>
+                </div>
+                
+                <div class="form-field passengers">
+                    <label>Passengers</label>
+                    <div class="passenger-dropdown" onclick="togglePassengerMenu()">
+                        <div class="passenger-display">
+                            <div class="passenger-info">
+                                <span class="passenger-count" id="passenger_count">1 passenger</span>
+                                <span class="passenger-class" id="passenger_class">Economy</span>
+                            </div>
+                            <span class="dropdown-arrow">▼</span>
+                        </div>
+                    </div>
+                    <input type="hidden" id="passengers" name="passengers" value="1">
+                    <input type="hidden" id="class" name="class" value="economy">
+                </div>
+            </form>
+            
+            <div class="search-button-container">
+                <a href="#" class="multi-city-link" onclick="event.preventDefault(); alert('Multi-city route feature coming soon!');">
+                    🔗 Create multi-city route
+                </a>
+                <button type="submit" form="flightSearchForm" class="search-button">Search flights</button>
+            </div>
+            
+            <div class="booking-checkbox">
+                <input type="checkbox" id="open_booking" name="open_booking">
+                <label for="open_booking">Open Booking.com in new tab</label>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Set minimum date to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('departure_date').min = today;
+        document.getElementById('return_date').min = today;
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.closest('.tab').classList.add('active');
+            
+            if (tab === 'hotels') {
+                window.location.href = '/hotels';
+            } else if (tab === 'favorites') {
+                alert('Favorites feature coming soon!');
+            }
+        }
+
+        function swapAirports() {
+            const departure = document.getElementById('departure_city').value;
+            const arrival = document.getElementById('arrival_city').value;
+            const depCode = document.getElementById('departure_code').textContent;
+            const arrCode = document.getElementById('arrival_code').textContent;
+            
+            document.getElementById('departure_city').value = arrival;
+            document.getElementById('arrival_city').value = departure;
+            document.getElementById('departure_code').textContent = arrCode;
+            document.getElementById('arrival_code').textContent = depCode;
+        }
+
+        function clearDate(fieldId) {
+            document.getElementById(fieldId).value = '';
+        }
+
+        function togglePassengerMenu() {
+            const passengers = prompt('Enter number of passengers (1-9):', '1');
+            if (passengers && parseInt(passengers) >= 1 && parseInt(passengers) <= 9) {
+                document.getElementById('passengers').value = passengers;
+                document.getElementById('passenger_count').textContent = 
+                    passengers + (parseInt(passengers) === 1 ? ' passenger' : ' passengers');
+            }
+            
+            const classes = ['Economy', 'Business', 'First'];
+            const selectedClass = prompt('Select class:\n1. Economy\n2. Business\n3. First', '1');
+            if (selectedClass) {
+                const classIndex = parseInt(selectedClass) - 1;
+                if (classIndex >= 0 && classIndex < classes.length) {
+                    document.getElementById('class').value = classes[classIndex].toLowerCase();
+                    document.getElementById('passenger_class').textContent = classes[classIndex];
+                }
+            }
+        }
+
+        function handleSearch(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+            const params = new URLSearchParams();
+            
+            // Build query parameters
+            for (const [key, value] of formData.entries()) {
+                if (value && value.trim()) {
+                    params.append(key, value.trim());
+                }
+            }
+            
+            // Redirect to results page
+            window.location.href = `/search/results?${params.toString()}`;
+        }
+
+        // Auto-detect airport codes (simplified - in production, use API)
+        document.getElementById('departure_city').addEventListener('blur', function() {
+            const city = this.value.toLowerCase();
+            const codes = {
+                'krakow': 'KRK', 'kraków': 'KRK',
+                'tashkent': 'TAS',
+                'london': 'LHR', 'lhr': 'LHR',
+                'new york': 'JFK', 'jfk': 'JFK',
+                'paris': 'CDG', 'cdg': 'CDG'
+            };
+            if (codes[city]) {
+                document.getElementById('departure_code').textContent = codes[city];
+            }
+        });
+
+        document.getElementById('arrival_city').addEventListener('blur', function() {
+            const city = this.value.toLowerCase();
+            const codes = {
+                'krakow': 'KRK', 'kraków': 'KRK',
+                'tashkent': 'TAS',
+                'london': 'LHR', 'lhr': 'LHR',
+                'new york': 'JFK', 'jfk': 'JFK',
+                'paris': 'CDG', 'cdg': 'CDG'
+            };
+            if (codes[city]) {
+                document.getElementById('arrival_code').textContent = codes[city];
+            }
+        });
+    </script>
+</body>
+</html>
+

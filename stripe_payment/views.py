@@ -507,8 +507,32 @@ class PaymentSuccessView(View):
     """Handle successful payment redirect from Stripe Checkout"""
     def get(self, request):
         session_id = request.GET.get('session_id')
+        order = None
+        user_email = None
+        
+        try:
+            # Retrieve Stripe session to get order information
+            if session_id:
+                session = stripe.checkout.Session.retrieve(session_id)
+                
+                # Get order_id from metadata
+                order_id = session.metadata.get('order_id')
+                if order_id:
+                    order = Order.objects.select_related(
+                        'user', 
+                        'flight',
+                        'flight__arrival_airport',
+                        'flight__departure_airport',
+                        'flight__airline'
+                    ).prefetch_related('tickets').get(id=order_id)
+                    user_email = order.user.email if order.user else None
+        except Exception as e:
+            logger.error(f"Error retrieving order info for session {session_id}: {e}")
+        
         return render(request, 'payment_success.html', {
-            'session_id': session_id
+            'session_id': session_id,
+            'order': order,
+            'user_email': user_email
         })
 
 

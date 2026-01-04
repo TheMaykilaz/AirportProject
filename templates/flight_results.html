@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flight Search Results</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+        .top-bar {
+            background: #0b57d0;
+            color: white;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .search-params {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .param-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+        }
+        .param-value {
+            font-weight: 600;
+        }
+        .search-again-btn {
+            background: #ff6b35;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .search-again-btn:hover {
+            background: #e55a2b;
+        }
+        .multi-city-link {
+            color: white;
+            text-decoration: none;
+            font-size: 14px;
+            margin-left: 20px;
+        }
+        .nearby-dates {
+            background: white;
+            padding: 16px 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .nearby-dates h3 {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 12px;
+        }
+        .dates-scroll {
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+        }
+        .date-option {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            white-space: nowrap;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .date-option:hover {
+            border-color: #0b57d0;
+        }
+        .date-option.selected {
+            background: #0b57d0;
+            color: white;
+            border-color: #0b57d0;
+        }
+        .date-range {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .date-price {
+            font-size: 12px;
+            color: #666;
+        }
+        .date-option.selected .date-price {
+            color: rgba(255, 255, 255, 0.9);
+        }
+        .main-content {
+            display: flex;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            gap: 20px;
+        }
+        .sidebar {
+            width: 280px;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+        }
+        .sidebar-section {
+            margin-bottom: 24px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .sidebar-section:last-child {
+            border-bottom: none;
+        }
+        .sidebar-section h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #333;
+        }
+        .save-search-btn {
+            width: 100%;
+            padding: 10px;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        .save-search-btn:hover {
+            background: #e0e0e0;
+        }
+        .filter-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .filter-option input[type="checkbox"],
+        .filter-option input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        .filter-option label {
+            flex: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .filter-price {
+            color: #666;
+            font-weight: 500;
+        }
+        .slider-container {
+            margin: 12px 0;
+        }
+        .slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #ddd;
+            outline: none;
+        }
+        .slider-value {
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            margin-top: 6px;
+        }
+        .toggle-switch {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .toggle-switch input[type="checkbox"] {
+            width: 40px;
+            height: 20px;
+            appearance: none;
+            background: #ccc;
+            border-radius: 10px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .toggle-switch input[type="checkbox"]:checked {
+            background: #0b57d0;
+        }
+        .toggle-switch input[type="checkbox"]::before {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: white;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+        }
+        .toggle-switch input[type="checkbox"]:checked::before {
+            transform: translateX(20px);
+        }
+        .toggle-switch label {
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .select-all-link {
+            color: #0b57d0;
+            text-decoration: none;
+            font-size: 12px;
+            margin-bottom: 10px;
+            display: inline-block;
+        }
+        .select-all-link:hover {
+            text-decoration: underline;
+        }
+        .results-area {
+            flex: 1;
+        }
+        .flight-result {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .result-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        .badge-cheapest {
+            background: #27ae60;
+            color: white;
+        }
+        .badge-fastest {
+            background: #0b57d0;
+            color: white;
+        }
+        .badge-convenient {
+            background: #3498db;
+            color: white;
+        }
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 16px;
+        }
+        .result-price {
+            text-align: right;
+        }
+        .price-amount {
+            font-size: 32px;
+            font-weight: 700;
+            color: #333;
+            line-height: 1;
+        }
+        .price-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+        .price-warning {
+            color: #e74c3c;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        .result-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .action-icon {
+            width: 32px;
+            height: 32px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            background: white;
+        }
+        .action-icon:hover {
+            background: #f5f5f5;
+        }
+        .flight-segment {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: #f9f9f9;
+            border-radius: 6px;
+            margin-bottom: 12px;
+        }
+        .airline-logo {
+            width: 48px;
+            height: 48px;
+            background: #0b57d0;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+        .flight-details {
+            flex: 1;
+        }
+        .flight-times {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        .time {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .airport-code {
+            font-size: 14px;
+            color: #666;
+        }
+        .flight-route {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        .flight-duration {
+            font-size: 12px;
+            color: #666;
+        }
+        .layover-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+        .book-btn {
+            background: #ff6b35;
+            color: white;
+            border: none;
+            padding: 12px 32px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 16px;
+            width: 100%;
+        }
+        .book-btn:hover {
+            background: #e55a2b;
+        }
+        @media (max-width: 1024px) {
+            .main-content {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+                position: static;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <div class="search-params">
+            <div class="param-item">
+                <span>{{ departure_city|default:"Krakow" }}</span>
+                <span class="param-value">{{ departure_code|default:"KRK" }}</span>
+            </div>
+            <span>→</span>
+            <div class="param-item">
+                <span>{{ arrival_city|default:"Tashkent" }}</span>
+                <span class="param-value">{{ arrival_code|default:"TAS" }}</span>
+            </div>
+            <div class="param-item">
+                <span>{{ departure_date|date:"D d M"|default:"Wed 11 Feb" }}</span>
+            </div>
+            {% if return_date %}
+            <div class="param-item">
+                <span>{{ return_date|date:"D d M"|default:"Mon 16 Feb" }}</span>
+            </div>
+            {% endif %}
+            <div class="param-item">
+                <span>{{ passengers|default:"1" }} passenger{{ passengers|pluralize }} {{ class|default:"Economy" }}</span>
+            </div>
+        </div>
+        <div>
+            <button class="search-again-btn" onclick="window.location.href='/search'">Search flights</button>
+            <a href="#" class="multi-city-link" onclick="event.preventDefault();">Create multi-city route</a>
+        </div>
+    </div>
+
+    <div class="nearby-dates">
+        <h3>Prices for nearby dates</h3>
+        <div class="dates-scroll">
+            {% for date_option in nearby_dates %}
+            <div class="date-option {% if date_option.selected %}selected{% endif %}" onclick="selectDate('{{ date_option.departure }}', '{{ date_option.return }}')">
+                <div class="date-range">{{ date_option.range }}</div>
+                <div class="date-price">{{ date_option.price }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="main-content">
+        <aside class="sidebar">
+            <button class="save-search-btn" onclick="saveSearch()">
+                ❤️ Save search
+            </button>
+
+            <div class="sidebar-section">
+                <h3>Baggage</h3>
+                <div class="filter-option">
+                    <input type="checkbox" id="baggage_included" name="baggage" value="included">
+                    <label for="baggage_included">
+                        <span>Baggage included</span>
+                        <span class="filter-price">€28,194</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Layovers</h3>
+                <div class="filter-option">
+                    <input type="radio" id="layover_1" name="layovers" value="1">
+                    <label for="layover_1">
+                        <span>1 layover</span>
+                        <span class="filter-price">€23,588</span>
+                    </label>
+                </div>
+                <div class="filter-option">
+                    <input type="radio" id="layover_2" name="layovers" value="2">
+                    <label for="layover_2">
+                        <span>2 layovers</span>
+                        <span class="filter-price">€25,686</span>
+                    </label>
+                </div>
+                <div class="filter-option">
+                    <input type="radio" id="layover_3" name="layovers" value="3">
+                    <label for="layover_3">
+                        <span>3 layovers</span>
+                        <span class="filter-price">€23,306</span>
+                    </label>
+                </div>
+                <div class="filter-option">
+                    <input type="radio" id="layover_4" name="layovers" value="4" checked>
+                    <label for="layover_4">
+                        <span>4 layovers</span>
+                        <span class="filter-price">€23,078</span>
+                    </label>
+                </div>
+                <div class="slider-container">
+                    <input type="range" min="0" max="24" value="24" class="slider" id="layover_duration" oninput="updateLayoverDuration(this.value)">
+                    <div class="slider-value">Layover duration: Up to <span id="duration_value">24</span>hr</div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Layover conditions</h3>
+                <a href="#" class="select-all-link" onclick="selectAllLayoverConditions(); return false;">Select all</a>
+                <div class="toggle-switch">
+                    <input type="checkbox" id="convenient_layovers">
+                    <label for="convenient_layovers">Convenient layovers</label>
+                </div>
+                <div class="toggle-switch">
+                    <input type="checkbox" id="no_recheck">
+                    <label for="no_recheck">No repeat check-in</label>
+                </div>
+                <div class="toggle-switch">
+                    <input type="checkbox" id="no_visa_layovers">
+                    <label for="no_visa_layovers">Exclude layovers requiring visas</label>
+                </div>
+                <div class="toggle-switch">
+                    <input type="checkbox" id="no_airport_change">
+                    <label for="no_airport_change">No airport changes</label>
+                </div>
+                <div class="toggle-switch">
+                    <input type="checkbox" id="no_overnight_layovers">
+                    <label for="no_overnight_layovers">No overnight layovers</label>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Departure time to {{ arrival_code|default:"TAS" }}</h3>
+                <div class="filter-option">
+                    <input type="checkbox" id="dep_morning">
+                    <label for="dep_morning"><span>Morning (6:00-12:00)</span></label>
+                </div>
+                <div class="filter-option">
+                    <input type="checkbox" id="dep_afternoon">
+                    <label for="dep_afternoon"><span>Afternoon (12:00-18:00)</span></label>
+                </div>
+                <div class="filter-option">
+                    <input type="checkbox" id="dep_evening">
+                    <label for="dep_evening"><span>Evening (18:00-24:00)</span></label>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Departure time to {{ departure_code|default:"KRK" }}</h3>
+                <div class="filter-option">
+                    <input type="checkbox" id="ret_morning">
+                    <label for="ret_morning"><span>Morning (6:00-12:00)</span></label>
+                </div>
+                <div class="filter-option">
+                    <input type="checkbox" id="ret_afternoon">
+                    <label for="ret_afternoon"><span>Afternoon (12:00-18:00)</span></label>
+                </div>
+                <div class="filter-option">
+                    <input type="checkbox" id="ret_evening">
+                    <label for="ret_evening"><span>Evening (18:00-24:00)</span></label>
+                </div>
+            </div>
+        </aside>
+
+        <div class="results-area">
+            {% for result in flight_results %}
+            <div class="flight-result">
+                {% if result.badge %}
+                <div class="result-badge badge-{{ result.badge_type }}">{{ result.badge }}</div>
+                {% endif %}
+                
+                <div class="result-header">
+                    <div>
+                        <div class="price-info">{{ result.baggage_info }}</div>
+                        {% if result.warning %}
+                        <div class="price-warning">{{ result.warning }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="result-price">
+                        <div class="price-amount">€{{ result.price|floatformat:0 }}</div>
+                    </div>
+                    <div class="result-actions">
+                        <div class="action-icon" title="Save">❤️</div>
+                        <div class="action-icon" title="Share">📤</div>
+                    </div>
+                </div>
+
+                <div class="flight-segment">
+                    <div class="airline-logo">{{ result.outbound.airline_code }}</div>
+                    <div class="flight-details">
+                        <div class="flight-times">
+                            <div>
+                                <span class="time">{{ result.outbound.departure_time|date:"H:i" }}</span>
+                                <span class="airport-code">{{ result.outbound.departure_code }}</span>
+                            </div>
+                            <span>→</span>
+                            <div>
+                                <span class="time">{{ result.outbound.arrival_time|date:"H:i" }}</span>
+                                <span class="airport-code">{{ result.outbound.arrival_code }}</span>
+                            </div>
+                        </div>
+                        <div class="flight-route">{{ result.outbound.departure_city }} {{ result.outbound.departure_date|date:"D d M" }}</div>
+                        <div class="flight-duration">{{ result.outbound.duration }}, {{ result.outbound.layovers }} layover{{ result.outbound.layovers|pluralize }}</div>
+                        {% if result.outbound.layover_airports %}
+                        <div class="layover-info">Layover airports: {{ result.outbound.layover_airports }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if result.return %}
+                <div class="flight-segment">
+                    <div class="airline-logo">{{ result.return.airline_code }}</div>
+                    <div class="flight-details">
+                        <div class="flight-times">
+                            <div>
+                                <span class="time">{{ result.return.departure_time|date:"H:i" }}</span>
+                                <span class="airport-code">{{ result.return.departure_code }}</span>
+                            </div>
+                            <span>→</span>
+                            <div>
+                                <span class="time">{{ result.return.arrival_time|date:"H:i" }}</span>
+                                <span class="airport-code">{{ result.return.arrival_code }}</span>
+                            </div>
+                        </div>
+                        <div class="flight-route">{{ result.return.departure_city }} {{ result.return.departure_date|date:"D d M" }}</div>
+                        <div class="flight-duration">{{ result.return.duration }}, {{ result.return.layovers }} layover{{ result.return.layovers|pluralize }}</div>
+                        {% if result.return.layover_airports %}
+                        <div class="layover-info">Layover airports: {{ result.return.layover_airports }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <button class="book-btn" onclick="bookFlight({{ result.flight_id }})">Book</button>
+            </div>
+            {% empty %}
+            <div class="flight-result">
+                <p>No flights found. Try adjusting your search criteria.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script>
+        function updateLayoverDuration(value) {
+            document.getElementById('duration_value').textContent = value;
+        }
+
+        function selectAllLayoverConditions() {
+            const checkboxes = ['convenient_layovers', 'no_recheck', 'no_visa_layovers', 'no_airport_change', 'no_overnight_layovers'];
+            const allChecked = checkboxes.every(id => document.getElementById(id).checked);
+            checkboxes.forEach(id => {
+                document.getElementById(id).checked = !allChecked;
+            });
+        }
+
+        function selectDate(departure, returnDate) {
+            const params = new URLSearchParams(window.location.search);
+            params.set('departure_date', departure);
+            if (returnDate) {
+                params.set('return_date', returnDate);
+            }
+            window.location.search = params.toString();
+        }
+
+        function saveSearch() {
+            alert('Search saved to favorites!');
+        }
+
+        function bookFlight(flightId) {
+            window.location.href = `/api/bookings/orders/create_with_tickets/?flight_id=${flightId}`;
+        }
+    </script>
+</body>
+</html>
+

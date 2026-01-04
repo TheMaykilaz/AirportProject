@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hotels Near {{ airport_code|default:"Your Destination" }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        .main-content {
+            display: flex;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            gap: 20px;
+        }
+        .sidebar {
+            width: 280px;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+        }
+        .sidebar-section {
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .sidebar-section:last-child {
+            border-bottom: none;
+        }
+        .sidebar-section h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .filter-option {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .filter-option input[type="checkbox"],
+        .filter-option input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        .filter-option label {
+            cursor: pointer;
+            font-size: 14px;
+            color: #555;
+            flex: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .filter-option label span {
+            color: #999;
+            font-size: 12px;
+        }
+        .price-range {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .price-range input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .distance-slider {
+            width: 100%;
+            margin: 10px 0;
+        }
+        .apply-filters {
+            width: 100%;
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 15px;
+        }
+        .apply-filters:hover {
+            background: #5568d3;
+        }
+        .results-area {
+            flex: 1;
+        }
+        .results-header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .results-count {
+            font-size: 16px;
+            color: #666;
+        }
+        .sort-options {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .sort-options label {
+            font-size: 14px;
+            color: #666;
+        }
+        .sort-options select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .hotels-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .hotel-card {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+        }
+        .hotel-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .hotel-card.featured {
+            border: 2px solid #667eea;
+        }
+        .hotel-image {
+            width: 280px;
+            height: 220px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 64px;
+            flex-shrink: 0;
+            position: relative;
+        }
+        .hotel-badge {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: #f39c12;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .hotel-content {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        .hotel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+        }
+        .hotel-title {
+            flex: 1;
+        }
+        .hotel-title h3 {
+            font-size: 22px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .hotel-location {
+            color: #666;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .hotel-rating {
+            background: #f39c12;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .hotel-actions {
+            display: flex;
+            gap: 10px;
+            margin-left: 15px;
+        }
+        .action-btn {
+            width: 36px;
+            height: 36px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .action-btn:hover {
+            background: #f5f5f5;
+            border-color: #667eea;
+        }
+        .hotel-details {
+            display: flex;
+            gap: 20px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        .hotel-detail-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: #666;
+            font-size: 14px;
+        }
+        .hotel-amenities {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 15px 0;
+        }
+        .amenity-tag {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .hotel-footer {
+            margin-top: auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+        .hotel-price {
+            text-align: right;
+        }
+        .price-amount {
+            font-size: 28px;
+            font-weight: 700;
+            color: #667eea;
+            line-height: 1;
+        }
+        .price-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+        .book-btn {
+            background: #27ae60;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-block;
+            transition: background 0.2s;
+        }
+        .book-btn:hover {
+            background: #229954;
+        }
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            background: white;
+            border-radius: 8px;
+        }
+        .no-results h2 {
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .no-results p {
+            color: #999;
+        }
+        .collapse-toggle {
+            cursor: pointer;
+            color: #667eea;
+            font-size: 14px;
+        }
+        .collapse-toggle:hover {
+            text-decoration: underline;
+        }
+        @media (max-width: 1024px) {
+            .main-content {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+                position: static;
+            }
+        }
+        @media (max-width: 768px) {
+            .hotel-card {
+                flex-direction: column;
+            }
+            .hotel-image {
+                width: 100%;
+                height: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏨 Hotels Near {{ airport_name|default:airport_code|default:"Your Destination" }}</h1>
+        {% if airport_code %}
+        <p>Find the perfect accommodation near {{ airport_code }} airport</p>
+        {% else %}
+        <p>Find the perfect accommodation for your trip</p>
+        {% endif %}
+    </div>
+
+    <div class="main-content">
+        <aside class="sidebar">
+            <form method="get" action="/hotels" id="filterForm">
+                <input type="hidden" name="airport_code" value="{{ airport_code }}">
+                
+                <div class="sidebar-section">
+                    <h3>
+                        Price Range ($)
+                        <span class="collapse-toggle" onclick="toggleSection(this)">−</span>
+                    </h3>
+                    <div class="price-range">
+                        <input type="number" name="min_price" placeholder="Min" id="min_price" value="{{ request.GET.min_price }}">
+                        <span>—</span>
+                        <input type="number" name="max_price" placeholder="Max" id="max_price" value="{{ request.GET.max_price }}">
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3>
+                        Distance from Airport
+                        <span class="collapse-toggle" onclick="toggleSection(this)">−</span>
+                    </h3>
+                    <input type="range" name="max_distance_km" min="1" max="50" value="{{ max_distance|default:'10' }}" 
+                           class="distance-slider" id="distance_slider" oninput="updateDistance(this.value)">
+                    <div style="text-align: center; color: #666; font-size: 14px; margin-top: 5px;">
+                        Up to <strong id="distance_value">{{ max_distance|default:'10' }}</strong> km
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3>
+                        Star Rating
+                        <span class="collapse-toggle" onclick="toggleSection(this)">−</span>
+                    </h3>
+                    {% for i in "54321" %}
+                    <div class="filter-option">
+                        <input type="radio" name="min_star_rating" value="{{ i }}" id="stars_{{ i }}"
+                               {% if min_star_rating == i %}checked{% endif %}>
+                        <label for="stars_{{ i }}">
+                            <span>{{ i }}★ and above</span>
+                        </label>
+                    </div>
+                    {% endfor %}
+                    <div class="filter-option">
+                        <input type="radio" name="min_star_rating" value="" id="stars_any"
+                               {% if not min_star_rating %}checked{% endif %}>
+                        <label for="stars_any">
+                            <span>Any rating</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3>
+                        Amenities
+                        <span class="collapse-toggle" onclick="toggleSection(this)">−</span>
+                    </h3>
+                    <div class="filter-option">
+                        <input type="checkbox" name="amenities" value="wifi" id="amenity_wifi"
+                               {% for req_amenity in request.GET.amenities %}{% if req_amenity == "wifi" %}checked{% endif %}{% endfor %}>
+                        <label for="amenity_wifi"><span>Wifi</span></label>
+                    </div>
+                    <div class="filter-option">
+                        <input type="checkbox" name="amenities" value="pool" id="amenity_pool"
+                               {% for req_amenity in request.GET.amenities %}{% if req_amenity == "pool" %}checked{% endif %}{% endfor %}>
+                        <label for="amenity_pool"><span>Pool</span></label>
+                    </div>
+                    <div class="filter-option">
+                        <input type="checkbox" name="amenities" value="gym" id="amenity_gym"
+                               {% for req_amenity in request.GET.amenities %}{% if req_amenity == "gym" %}checked{% endif %}{% endfor %}>
+                        <label for="amenity_gym"><span>Gym</span></label>
+                    </div>
+                    <div class="filter-option">
+                        <input type="checkbox" name="amenities" value="parking" id="amenity_parking"
+                               {% for req_amenity in request.GET.amenities %}{% if req_amenity == "parking" %}checked{% endif %}{% endfor %}>
+                        <label for="amenity_parking"><span>Parking</span></label>
+                    </div>
+                    <div class="filter-option">
+                        <input type="checkbox" name="amenities" value="breakfast" id="amenity_breakfast"
+                               {% for req_amenity in request.GET.amenities %}{% if req_amenity == "breakfast" %}checked{% endif %}{% endfor %}>
+                        <label for="amenity_breakfast"><span>Breakfast</span></label>
+                    </div>
+                    <div class="filter-option">
+                        <input type="checkbox" name="amenities" value="spa" id="amenity_spa"
+                               {% for req_amenity in request.GET.amenities %}{% if req_amenity == "spa" %}checked{% endif %}{% endfor %}>
+                        <label for="amenity_spa"><span>Spa</span></label>
+                    </div>
+                    <div class="filter-option">
+                        <input type="checkbox" name="amenities" value="restaurant" id="amenity_restaurant"
+                               {% for req_amenity in request.GET.amenities %}{% if req_amenity == "restaurant" %}checked{% endif %}{% endfor %}>
+                        <label for="amenity_restaurant"><span>Restaurant</span></label>
+                    </div>
+                    <div class="filter-option">
+                        <input type="checkbox" name="amenities" value="bar" id="amenity_bar"
+                               {% for req_amenity in request.GET.amenities %}{% if req_amenity == "bar" %}checked{% endif %}{% endfor %}>
+                        <label for="amenity_bar"><span>Bar</span></label>
+                    </div>
+                    <div class="filter-option">
+                        <input type="checkbox" name="amenities" value="airport_shuttle" id="amenity_airport_shuttle"
+                               {% for req_amenity in request.GET.amenities %}{% if req_amenity == "airport_shuttle" %}checked{% endif %}{% endfor %}>
+                        <label for="amenity_airport_shuttle"><span>Airport Shuttle</span></label>
+                    </div>
+                </div>
+
+                <button type="submit" class="apply-filters">Apply Filters</button>
+            </form>
+        </aside>
+
+        <div class="results-area">
+            <div class="results-header">
+                <div class="results-count">
+                    Found <strong>{{ hotels.count }}</strong> hotel{{ hotels.count|pluralize }}
+                    {% if airport_code %}near {{ airport_code }}{% endif %}
+                </div>
+                <div class="sort-options">
+                    <label>Sort by:</label>
+                    <select name="sort" id="sortSelect" onchange="sortHotels(this.value)">
+                        <option value="price_asc">Price: Low to High</option>
+                        <option value="price_desc">Price: High to Low</option>
+                        <option value="rating_desc">Rating: High to Low</option>
+                        <option value="distance_asc">Distance: Nearest First</option>
+                    </select>
+                </div>
+            </div>
+
+            {% if hotels %}
+            <div class="hotels-list" id="hotelsList">
+                {% for hotel in hotels %}
+                <div class="hotel-card" data-price="{{ hotel.min_price|default:0|floatformat:2 }}" 
+                     data-rating="{{ hotel.star_rating }}" data-distance="{{ hotel.distance_from_airport_km|floatformat:2 }}">
+                    {% if forloop.first %}
+                    <div class="hotel-badge">Best Price</div>
+                    {% endif %}
+                    <div class="hotel-image">
+                        🏨
+                    </div>
+                    <div class="hotel-content">
+                        <div class="hotel-header">
+                            <div class="hotel-title">
+                                <h3>{{ hotel.name }}</h3>
+                                <div class="hotel-location">
+                                    📍 {{ hotel.city }}, {{ hotel.country }}
+                                    {% if hotel.nearest_airport %}
+                                        • {{ hotel.nearest_airport.code }}
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="hotel-rating">
+                                ⭐ {{ hotel.star_rating }}★
+                            </div>
+                            <div class="hotel-actions">
+                                <button class="action-btn" title="Save" onclick="saveHotel({{ hotel.id }})">❤️</button>
+                                <button class="action-btn" title="Share" onclick="shareHotel({{ hotel.id }})">📤</button>
+                            </div>
+                        </div>
+                        
+                        {% if hotel.description %}
+                        <p style="color: #666; margin: 10px 0; line-height: 1.6;">{{ hotel.description|truncatewords:40 }}</p>
+                        {% endif %}
+                        
+                        <div class="hotel-details">
+                            <div class="hotel-detail-item">
+                                📏 {{ hotel.distance_from_airport_km }} km from airport
+                            </div>
+                            {% if hotel.rooms.exists %}
+                            <div class="hotel-detail-item">
+                                🛏️ {{ hotel.rooms.count }} room{{ hotel.rooms.count|pluralize }} available
+                            </div>
+                            {% endif %}
+                            {% if hotel.address %}
+                            <div class="hotel-detail-item">
+                                📍 {{ hotel.address|truncatewords:5 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        {% if hotel.amenities %}
+                        <div class="hotel-amenities">
+                            {% for amenity in hotel.amenities|slice:":6" %}
+                            <span class="amenity-tag">{{ amenity|title }}</span>
+                            {% endfor %}
+                            {% if hotel.amenities|length > 6 %}
+                            <span class="amenity-tag">+{{ hotel.amenities|length|add:"-6" }} more</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        
+                        <div class="hotel-footer">
+                            <div>
+                                <a href="/api/hotels/hotels/{{ hotel.id }}/" class="book-btn" target="_blank">
+                                    View Details & Book
+                                </a>
+                            </div>
+                            <div class="hotel-price">
+                                {% if hotel.min_price %}
+                                <div class="price-amount">${{ hotel.min_price|floatformat:2 }}</div>
+                                <div class="price-label">per night</div>
+                                {% else %}
+                                <div class="price-label">Price on request</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="no-results">
+                <h2>No hotels found</h2>
+                <p>Try adjusting your search filters or check back later.</p>
+                {% if airport_code %}
+                <p style="margin-top: 10px;">
+                    <strong>Tip:</strong> Make sure there are hotels added for {{ airport_code }} in the database.
+                </p>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        function toggleSection(element) {
+            const section = element.closest('.sidebar-section');
+            const content = section.querySelectorAll('.filter-option, .price-range, .distance-slider');
+            const isVisible = content[0].style.display !== 'none';
+            
+            content.forEach(el => {
+                el.style.display = isVisible ? 'none' : 'block';
+            });
+            element.textContent = isVisible ? '+' : '−';
+        }
+
+        function updateDistance(value) {
+            document.getElementById('distance_value').textContent = value;
+        }
+
+        function sortHotels(sortBy) {
+            const hotelsList = document.getElementById('hotelsList');
+            const hotels = Array.from(hotelsList.children);
+            
+            hotels.sort((a, b) => {
+                const priceA = parseFloat(a.dataset.price) || 0;
+                const priceB = parseFloat(b.dataset.price) || 0;
+                const ratingA = parseFloat(a.dataset.rating) || 0;
+                const ratingB = parseFloat(b.dataset.rating) || 0;
+                const distanceA = parseFloat(a.dataset.distance) || 999;
+                const distanceB = parseFloat(b.dataset.distance) || 999;
+                
+                switch(sortBy) {
+                    case 'price_asc':
+                        return priceA - priceB;
+                    case 'price_desc':
+                        return priceB - priceA;
+                    case 'rating_desc':
+                        return ratingB - ratingA;
+                    case 'distance_asc':
+                        return distanceA - distanceB;
+                    default:
+                        return 0;
+                }
+            });
+            
+            hotels.forEach(hotel => hotelsList.appendChild(hotel));
+        }
+
+        function saveHotel(hotelId) {
+            alert('Save functionality - Hotel ID: ' + hotelId);
+            // TODO: Implement save to favorites
+        }
+
+        function shareHotel(hotelId) {
+            const url = window.location.origin + '/api/hotels/hotels/' + hotelId + '/';
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Check out this hotel',
+                    url: url
+                });
+            } else {
+                navigator.clipboard.writeText(url);
+                alert('Hotel link copied to clipboard!');
+            }
+        }
+    </script>
+</body>
+</html>

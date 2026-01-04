@@ -12,12 +12,16 @@ class IsAdmin(BasePermission):
         )
 
 class IsSelfOrAdmin(BasePermission):
+    def has_permission(self, request, view):
+        # For list/create actions, check if user is authenticated
+        return request.user and request.user.is_authenticated
+    
     def has_object_permission(self, request, view, obj):
         return (
-        obj == request.user or
+            obj == request.user or
             (request.user.is_authenticated and (
-            request.user.is_staff or getattr(request.user, 'role', None) == 'admin'))
-)
+                request.user.is_staff or getattr(request.user, 'role', None) == 'admin'))
+        )
 
 
 class ReadOnly(BasePermission):

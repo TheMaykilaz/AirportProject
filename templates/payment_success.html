@@ -3,75 +3,212 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Payment Successful</title>
+    <title>Payment Successful - Flight Booking Confirmed</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            max-width: 600px;
-            margin: 50px auto;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             padding: 20px;
-            background: #f5f5f5;
-            text-align: center;
         }
         .container {
             background: white;
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-width: 600px;
+            width: 100%;
+            padding: 50px 40px;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
         }
         .success-icon {
-            font-size: 64px;
-            margin-bottom: 20px;
+            width: 80px;
+            height: 80px;
+            background: #27ae60;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 30px;
+            font-size: 48px;
+            color: white;
         }
         h1 {
             color: #27ae60;
-            margin-bottom: 10px;
+            font-size: 32px;
+            margin-bottom: 15px;
+            font-weight: 600;
         }
-        p {
+        .subtitle {
             color: #666;
+            font-size: 18px;
+            margin-bottom: 30px;
             line-height: 1.6;
         }
-        .session-id {
-            background: #f0f0f0;
-            padding: 10px;
-            border-radius: 4px;
-            font-family: monospace;
-            margin: 20px 0;
-            word-break: break-all;
+        .email-notice {
+            background: #e8f5e9;
+            border-left: 4px solid #27ae60;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 30px 0;
+            text-align: left;
+        }
+        .email-notice strong {
+            color: #2e7d32;
+            display: block;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+        .email-notice p {
+            color: #555;
+            margin: 0;
+            line-height: 1.6;
+        }
+        {% if user_email %}
+        .email-address {
+            color: #667eea;
+            font-weight: 600;
+        }
+        {% endif %}
+        .booking-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 30px 0;
+            text-align: left;
+        }
+        .booking-info h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        .booking-info p {
+            color: #666;
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 40px;
         }
         .button {
             display: inline-block;
-            background: #635bff;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 4px;
+            padding: 16px 32px;
+            border-radius: 8px;
             text-decoration: none;
-            margin-top: 20px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
         }
-        .button:hover {
-            background: #4f46e5;
+        .button-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .button-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+        .button-secondary {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+        .button-secondary:hover {
+            background: #667eea;
+            color: white;
+        }
+        .session-id {
+            background: #f0f0f0;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin-top: 20px;
+            word-break: break-all;
+            color: #666;
+        }
+        .divider {
+            height: 1px;
+            background: #e0e0e0;
+            margin: 30px 0;
+        }
+        @media (max-width: 600px) {
+            .container {
+                padding: 30px 20px;
+            }
+            h1 {
+                font-size: 24px;
+            }
+            .subtitle {
+                font-size: 16px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="success-icon">✅</div>
+        <div class="success-icon">✓</div>
         <h1>Payment Successful!</h1>
-        <p>Your payment has been processed successfully.</p>
-        <p>You will receive a confirmation email shortly.</p>
+        <p class="subtitle">Your flight booking has been confirmed</p>
         
-        {% if session_id %}
-        <div class="session-id">
-            <strong>Session ID:</strong><br>
-            {{ session_id }}
+        <div class="email-notice">
+            <strong>📧 Confirmation Email Sent</strong>
+            <p>
+                {% if user_email %}
+                    Your flight tickets have been sent to <span class="email-address">{{ user_email }}</span>. 
+                    Please check your email inbox (and spam folder) for your booking confirmation and e-tickets.
+                {% else %}
+                    Your flight tickets have been sent to your email address. 
+                    Please check your inbox (and spam folder) for your booking confirmation and e-tickets.
+                {% endif %}
+            </p>
+        </div>
+
+        {% if order %}
+        <div class="booking-info">
+            <h3>Booking Details</h3>
+            <p><strong>Order ID:</strong> #{{ order.id }}</p>
+            {% if order.flight %}
+            <p><strong>Flight:</strong> {{ order.flight.airline.code }} {{ order.flight.flight_number }}</p>
+            <p><strong>Route:</strong> {{ order.flight.departure_airport.code }} → {{ order.flight.arrival_airport.code }}</p>
+            {% endif %}
+            <p><strong>Status:</strong> <span style="color: #27ae60; font-weight: 600;">Confirmed</span></p>
         </div>
         {% endif %}
-        
-        <p style="margin-top: 30px; color: #999; font-size: 14px;">
-            The webhook has been sent to your server to update the order status.
-        </p>
-        
-        <a href="/api/payments/test/" class="button">Make Another Payment</a>
+
+        <div class="divider"></div>
+
+        <div class="button-group">
+            {% if order and order.flight and order.flight.arrival_airport %}
+            <a href="/hotels?airport_code={{ order.flight.arrival_airport.code }}&max_distance_km=10" class="button button-primary">
+                🏨 Book a Hotel Near {{ order.flight.arrival_airport.code }}
+            </a>
+            {% else %}
+            <a href="/hotels" class="button button-primary">
+                🏨 Book a Hotel Near Your Destination
+            </a>
+            {% endif %}
+            <a href="/" class="button button-secondary">
+                Return to Home
+            </a>
+        </div>
+
+        {% if session_id %}
+        <div class="session-id">
+            <strong>Session ID:</strong> {{ session_id }}
+        </div>
+        {% endif %}
     </div>
 </body>
 </html>

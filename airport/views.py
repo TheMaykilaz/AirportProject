@@ -575,7 +575,132 @@ class FlightSearchPageView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        return render(request, 'flight_search.html')
+        return render(request, 'flight_search_new.html')
+
+
+class FlightResultsPageView(APIView):
+    """Render the flight search results page with filters"""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        from datetime import datetime, timedelta
+        
+        # Get search parameters
+        departure_city = request.GET.get('departure_city', '')
+        arrival_city = request.GET.get('arrival_city', '')
+        departure_date = request.GET.get('departure_date', '')
+        return_date = request.GET.get('return_date', '')
+        passengers = int(request.GET.get('passengers', 1))
+        class_type = request.GET.get('class', 'economy')
+        
+        # Search for flights
+        search_params = {}
+        if departure_city:
+            search_params['departure_city'] = departure_city
+        if arrival_city:
+            search_params['arrival_city'] = arrival_city
+        if departure_date:
+            try:
+                search_params['departure_date'] = datetime.strptime(departure_date, '%Y-%m-%d').date()
+            except:
+                pass
+        if return_date:
+            try:
+                search_params['return_date'] = datetime.strptime(return_date, '%Y-%m-%d').date()
+            except:
+                pass
+        search_params['passengers'] = passengers
+        
+        # Use FlightSearchService to get results
+        from .services import FlightSearchService
+        search_results = FlightSearchService.search_flights(**search_params)
+        
+        # Process results for display
+        flight_results = []
+        if search_results.get('results'):
+            # Get cheapest
+            cheapest = search_results['results'][0] if search_results['results'] else None
+            if cheapest:
+                flight_results.append({
+                    'badge': 'Cheapest',
+                    'badge_type': 'cheapest',
+                    'price': cheapest['min_price'],
+                    'baggage_info': f"€{cheapest['max_price']:.0f} including baggage 1x10 kg",
+                    'flight_id': cheapest['flight'].id,
+                    'outbound': {
+                        'airline_code': cheapest['airline_code'],
+                        'departure_time': cheapest['flight'].departure_time,
+                        'departure_code': cheapest['flight'].departure_airport.code,
+                        'departure_city': cheapest['flight'].departure_airport.city,
+                        'departure_date': cheapest['flight'].departure_time.date(),
+                        'arrival_time': cheapest['flight'].arrival_time,
+                        'arrival_code': cheapest['flight'].arrival_airport.code,
+                        'duration': str(cheapest['flight'].duration).split('.')[0] if cheapest['flight'].duration else 'N/A',
+                        'layovers': 0,
+                        'layover_airports': ''
+                    }
+                })
+            
+            # Get fastest (shortest duration)
+            if len(search_results['results']) > 1:
+                fastest = min(search_results['results'], key=lambda x: x.get('duration_hours', 999) or 999)
+                if fastest and fastest != cheapest:
+                    flight_results.append({
+                        'badge': 'Fastest',
+                        'badge_type': 'fastest',
+                        'price': fastest['min_price'],
+                        'baggage_info': 'Baggage not included',
+                        'warning': '4 tickets left at this price',
+                        'flight_id': fastest['flight'].id,
+                        'outbound': {
+                            'airline_code': fastest['airline_code'],
+                            'departure_time': fastest['flight'].departure_time,
+                            'departure_code': fastest['flight'].departure_airport.code,
+                            'departure_city': fastest['flight'].departure_airport.city,
+                            'departure_date': fastest['flight'].departure_time.date(),
+                            'arrival_time': fastest['flight'].arrival_time,
+                            'arrival_code': fastest['flight'].arrival_airport.code,
+                            'duration': str(fastest['flight'].duration).split('.')[0] if fastest['flight'].duration else 'N/A',
+                            'layovers': 0,
+                            'layover_airports': ''
+                        }
+                    })
+        
+        # Generate nearby dates (simplified)
+        nearby_dates = []
+        if departure_date:
+            try:
+                base_date = datetime.strptime(departure_date, '%Y-%m-%d')
+                for i in range(-2, 4):
+                    date_obj = base_date + timedelta(days=i)
+                    nearby_dates.append({
+                        'departure': date_obj.strftime('%Y-%m-%d'),
+                        'return': (date_obj + timedelta(days=5)).strftime('%Y-%m-%d') if return_date else '',
+                        'range': f"{date_obj.strftime('%d %b')} - {(date_obj + timedelta(days=5)).strftime('%d %b')}" if return_date else date_obj.strftime('%d %b'),
+                        'price': f"€{23000 + abs(i) * 200:.0f}",
+                        'selected': i == 0
+                    })
+            except:
+                pass
+        
+        # Extract airport codes (simplified - would need proper lookup)
+        departure_code = departure_city[:3].upper() if len(departure_city) >= 3 else 'KRK'
+        arrival_code = arrival_city[:3].upper() if len(arrival_city) >= 3 else 'TAS'
+        
+        context = {
+            'departure_city': departure_city or 'Krakow',
+            'departure_code': departure_code,
+            'arrival_city': arrival_city or 'Tashkent',
+            'arrival_code': arrival_code,
+            'departure_date': datetime.strptime(departure_date, '%Y-%m-%d') if departure_date else None,
+            'return_date': datetime.strptime(return_date, '%Y-%m-%d') if return_date else None,
+            'passengers': passengers,
+            'class': class_type.capitalize(),
+            'flight_results': flight_results,
+            'nearby_dates': nearby_dates,
+        }
+        
+        return render(request, 'flight_results.html', context)
 
 
 

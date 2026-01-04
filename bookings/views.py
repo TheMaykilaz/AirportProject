@@ -23,8 +23,8 @@ class OrderViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
             return [IsSelfOrAdmin()]
-        elif self.action in ["create"]:
-            return []  # Any authenticated user can create orders
+        elif self.action in ["create", "create_with_tickets"]:
+            return [IsAuthenticated()]  # Any authenticated user can create orders
         elif self.action in ["update", "partial_update", "destroy"]:
             return [IsSelfOrAdmin()]
         return [IsAdmin()]
