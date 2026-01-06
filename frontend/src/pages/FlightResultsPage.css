@@ -6,20 +6,29 @@
 
 .flight-results-container {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background: #f5f5f5;
-  color: #333;
-  min-height: calc(100vh - 200px);
-  margin-top: -32px;
-  width: 100vw;
+  background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
+  color: #ffffff;
+  min-height: calc(100vh - 64px);
+  width: 100%;
   position: relative;
-  left: 50%;
-  right: 50%;
-  margin-left: -50vw;
-  margin-right: -50vw;
+}
+
+.flight-results-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(255, 87, 34, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255, 152, 0, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .top-bar {
-  background: #0b57d0;
+  background: #141414;
   color: white;
   padding: 16px 20px;
   display: flex;
@@ -27,6 +36,9 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
+  border-bottom: 1px solid rgba(255, 152, 0, 0.2);
+  position: relative;
+  z-index: 1;
 }
 
 .search-params {
@@ -41,32 +53,41 @@
   align-items: center;
   gap: 6px;
   font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .param-value {
   font-weight: 600;
+  color: #ff9800;
 }
 
 .search-again-btn {
-  background: #ff6b35;
+  background: linear-gradient(135deg, #ff5722 0%, #ff9800 100%);
   color: white;
   border: none;
   padding: 10px 24px;
-  border-radius: 6px;
+  border-radius: 50px;
   font-weight: 600;
   cursor: pointer;
   font-size: 14px;
+  transition: all 0.3s;
 }
 
 .search-again-btn:hover {
-  background: #e55a2b;
+  background: linear-gradient(135deg, #ff7043 0%, #ffb74d 100%);
+  transform: translateY(-2px);
 }
 
 .multi-city-link {
-  color: white;
+  color: #ff9800;
   text-decoration: none;
   font-size: 14px;
   margin-left: 20px;
+  transition: color 0.2s;
+}
+
+.multi-city-link:hover {
+  color: #ffb74d;
 }
 
 .main-content-wrapper {
@@ -75,6 +96,8 @@
   margin: 0 auto;
   padding: 20px;
   gap: 20px;
+  position: relative;
+  z-index: 1;
 }
 
 .main-content {
@@ -85,18 +108,19 @@
 
 .sidebar {
   width: 280px;
-  background: white;
-  border-radius: 8px;
+  background: #141414;
+  border-radius: 16px;
   padding: 20px;
   height: fit-content;
   position: sticky;
   top: 20px;
+  border: 1px solid rgba(255, 152, 0, 0.2);
 }
 
 .sidebar-section {
   margin-bottom: 24px;
   padding-bottom: 20px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid rgba(255, 152, 0, 0.1);
 }
 
 .sidebar-section:last-child {
@@ -107,15 +131,17 @@
   font-size: 14px;
   font-weight: 600;
   margin-bottom: 12px;
-  color: #333;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .save-search-btn {
   width: 100%;
   padding: 10px;
-  background: #f0f0f0;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  background: rgba(255, 152, 0, 0.15);
+  border: 1px solid rgba(255, 152, 0, 0.3);
+  border-radius: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -123,10 +149,13 @@
   gap: 8px;
   font-size: 14px;
   margin-bottom: 20px;
+  color: #ff9800;
+  transition: all 0.3s;
 }
 
 .save-search-btn:hover {
-  background: #e0e0e0;
+  background: rgba(255, 152, 0, 0.25);
+  border-color: rgba(255, 152, 0, 0.5);
 }
 
 .filter-option {
@@ -141,6 +170,7 @@
   width: 18px;
   height: 18px;
   cursor: pointer;
+  accent-color: #ff9800;
 }
 
 .filter-option label {
@@ -150,10 +180,11 @@
   align-items: center;
   cursor: pointer;
   font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .filter-price {
-  color: #666;
+  color: #ff9800;
   font-weight: 500;
 }
 
@@ -165,14 +196,15 @@
   width: 100%;
   height: 6px;
   border-radius: 3px;
-  background: #ddd;
+  background: rgba(255, 152, 0, 0.2);
   outline: none;
+  accent-color: #ff9800;
 }
 
 .slider-value {
   text-align: center;
   font-size: 12px;
-  color: #666;
+  color: rgba(255, 255, 255, 0.7);
   margin-top: 6px;
 }
 
@@ -187,7 +219,7 @@
   width: 40px;
   height: 20px;
   appearance: none;
-  background: #ccc;
+  background: rgba(255, 152, 0, 0.3);
   border-radius: 10px;
   position: relative;
   cursor: pointer;
@@ -195,7 +227,7 @@
 }
 
 .toggle-switch input[type="checkbox"]:checked {
-  background: #0b57d0;
+  background: linear-gradient(135deg, #ff5722 0%, #ff9800 100%);
 }
 
 .toggle-switch input[type="checkbox"]::before {
@@ -217,6 +249,7 @@
 .toggle-switch label {
   font-size: 14px;
   cursor: pointer;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .results-area {
@@ -225,18 +258,18 @@
 }
 
 .fare-summary {
-  background: white;
-  border-radius: 8px;
+  background: #141414;
+  border-radius: 16px;
   padding: 20px;
   margin-bottom: 20px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border: 1px solid rgba(255, 152, 0, 0.2);
 }
 
 .fare-summary h3 {
   font-size: 16px;
   font-weight: 600;
   margin-bottom: 12px;
-  color: #333;
+  color: #ffffff;
 }
 
 .fare-features {
@@ -245,7 +278,7 @@
   gap: 12px;
   margin-bottom: 12px;
   font-size: 14px;
-  color: #666;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .fare-more {
@@ -253,8 +286,13 @@
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  color: #0b57d0;
+  color: #ff9800;
   cursor: pointer;
+  transition: color 0.2s;
+}
+
+.fare-more:hover {
+  color: #ffb74d;
 }
 
 .flight-section {
@@ -265,33 +303,34 @@
   font-size: 18px;
   font-weight: 600;
   margin-bottom: 16px;
-  color: #333;
+  color: #ffffff;
 }
 
 .flight-result-card {
-  background: white;
-  border-radius: 8px;
+  background: #141414;
+  border-radius: 16px;
   padding: 20px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   cursor: pointer;
-  transition: all 0.2s;
-  border: 2px solid transparent;
+  transition: all 0.3s;
+  border: 1px solid rgba(255, 152, 0, 0.2);
 }
 
 .flight-result-card:hover {
-  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+  border-color: rgba(255, 152, 0, 0.4);
+  background: #1a1a1a;
 }
 
 .flight-result-card.selected {
-  border-color: #0b57d0;
-  box-shadow: 0 4px 12px rgba(11, 87, 208, 0.2);
+  border-color: #ff9800;
+  background: #1a1a1a;
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.2);
 }
 
 .flight-route-header {
   margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid rgba(255, 152, 0, 0.1);
 }
 
 .route-info {
@@ -303,12 +342,12 @@
 .route-cities {
   font-size: 16px;
   font-weight: 600;
-  color: #333;
+  color: #ffffff;
 }
 
 .route-duration {
   font-size: 14px;
-  color: #666;
+  color: rgba(255, 152, 0, 0.8);
 }
 
 .flight-segment-detailed {
@@ -328,8 +367,8 @@
 .airline-logo-small {
   width: 40px;
   height: 40px;
-  background: #0b57d0;
-  border-radius: 6px;
+  background: linear-gradient(135deg, #ff5722 0%, #ff9800 100%);
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -342,13 +381,13 @@
 .airline-name {
   font-size: 16px;
   font-weight: 600;
-  color: #333;
+  color: #ffffff;
   margin-bottom: 4px;
 }
 
 .flight-time-info {
   font-size: 14px;
-  color: #666;
+  color: rgba(255, 152, 0, 0.8);
 }
 
 .segment-details {
@@ -367,7 +406,7 @@
 .segment-time {
   font-size: 20px;
   font-weight: 600;
-  color: #333;
+  color: #ffffff;
   min-width: 60px;
 }
 
@@ -378,58 +417,59 @@
 .location-city {
   font-size: 16px;
   font-weight: 600;
-  color: #333;
+  color: #ffffff;
   margin-bottom: 4px;
 }
 
 .location-date {
   font-size: 14px;
-  color: #666;
+  color: rgba(255, 152, 0, 0.8);
   margin-bottom: 4px;
 }
 
 .location-airport {
   font-size: 12px;
-  color: #999;
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .details-btn {
-  background: none;
-  border: 1px solid #ddd;
+  background: transparent;
+  border: 1px solid rgba(255, 152, 0, 0.3);
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 14px;
-  color: #0b57d0;
+  color: #ff9800;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s;
 }
 
 .details-btn:hover {
-  background: #f5f5f5;
-  border-color: #0b57d0;
+  background: rgba(255, 152, 0, 0.1);
+  border-color: #ff9800;
 }
 
 .flight-action {
   display: flex;
   justify-content: flex-end;
   padding-top: 16px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid rgba(255, 152, 0, 0.1);
 }
 
 .price-btn {
-  background: #ff6b35;
+  background: linear-gradient(135deg, #ff5722 0%, #ff9800 100%);
   color: white;
   border: none;
   padding: 12px 24px;
-  border-radius: 6px;
+  border-radius: 50px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.3s;
 }
 
 .price-btn:hover {
-  background: #e55a2b;
+  background: linear-gradient(135deg, #ff7043 0%, #ffb74d 100%);
+  transform: translateY(-2px);
 }
 
 .booking-sidebar {
@@ -440,47 +480,51 @@
 }
 
 .booking-card {
-  background: white;
-  border-radius: 8px;
+  background: #141414;
+  border-radius: 16px;
   padding: 24px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  border: 1px solid rgba(255, 152, 0, 0.2);
 }
 
 .booking-price {
   text-align: center;
   margin-bottom: 20px;
   padding-bottom: 20px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid rgba(255, 152, 0, 0.1);
 }
 
 .price-amount-large {
   font-size: 36px;
   font-weight: 700;
-  color: #333;
+  background: linear-gradient(135deg, #ff5722 0%, #ff9800 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin-bottom: 8px;
 }
 
 .price-provider {
   font-size: 14px;
-  color: #666;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .buy-btn {
   width: 100%;
-  background: #ff6b35;
+  background: linear-gradient(135deg, #ff5722 0%, #ff9800 100%);
   color: white;
   border: none;
   padding: 16px;
-  border-radius: 8px;
+  border-radius: 50px;
   font-size: 18px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.3s;
   margin-bottom: 16px;
 }
 
 .buy-btn:hover {
-  background: #e55a2b;
+  background: linear-gradient(135deg, #ff7043 0%, #ffb74d 100%);
+  transform: translateY(-2px);
 }
 
 .trust-message {
@@ -488,13 +532,13 @@
   align-items: flex-start;
   gap: 8px;
   font-size: 12px;
-  color: #666;
+  color: rgba(255, 255, 255, 0.7);
   margin-bottom: 16px;
   line-height: 1.5;
 }
 
 .trust-icon {
-  color: #27ae60;
+  color: #4caf50;
   font-weight: 700;
   font-size: 16px;
   flex-shrink: 0;
@@ -502,7 +546,7 @@
 
 .booking-note {
   font-size: 12px;
-  color: #999;
+  color: rgba(255, 255, 255, 0.5);
   line-height: 1.6;
 }
 
@@ -512,7 +556,7 @@
 
 .poetic {
   font-style: italic;
-  color: #666;
+  color: rgba(255, 152, 0, 0.7);
 }
 
 .loading-spinner,
@@ -520,10 +564,11 @@
   text-align: center;
   padding: 40px;
   font-size: 18px;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .error-message {
-  color: #e74c3c;
+  color: #ff5722;
 }
 
 @media (max-width: 1400px) {

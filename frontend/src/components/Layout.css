@@ -108,6 +108,38 @@
   font-style: italic;
 }
 
+/* AI Chat Button - Dark Orange Theme */
+.ai-chat-button {
+  background: linear-gradient(135deg, rgba(255, 87, 34, 0.2) 0%, rgba(255, 152, 0, 0.2) 100%) !important;
+  border: 1px solid rgba(255, 152, 0, 0.4) !important;
+  color: #ff9800 !important;
+  padding: 8px 16px !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+  transition: all 0.3s ease !important;
+  text-decoration: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.ai-chat-button:hover {
+  background: linear-gradient(135deg, rgba(255, 87, 34, 0.3) 0%, rgba(255, 152, 0, 0.3) 100%) !important;
+  border-color: rgba(255, 152, 0, 0.6) !important;
+  color: #ffb74d !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.2) !important;
+}
+
+.ai-chat-button .MuiSvgIcon-root {
+  color: #ff9800 !important;
+}
+
+.ai-chat-button:hover .MuiSvgIcon-root {
+  color: #ffb74d !important;
+}
+
 @media (max-width: 768px) {
   .footer-bottom {
     flex-direction: column;
@@ -120,6 +152,11 @@
   
   .contact-item {
     gap: 8px;
+  }
+  
+  .ai-chat-button {
+    padding: 6px 12px !important;
+    font-size: 0.875rem !important;
   }
 }
 

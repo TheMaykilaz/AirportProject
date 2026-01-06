@@ -23,16 +23,25 @@ import {
   Facebook,
   Twitter,
   LinkedIn,
-  Instagram
+  Instagram,
+  SmartToy
 } from '@mui/icons-material'
-import { Link as RouterLink, useNavigate } from 'react-router-dom'
+import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useLanguage } from '../contexts/LanguageContext'
+import { t } from '../translations/translations'
 import './Layout.css'
 
 const Layout = ({ children }) => {
   const { user, logout } = useAuth()
+  const { language, toggleLanguage, currencySymbol } = useLanguage()
   const navigate = useNavigate()
+  const location = useLocation()
   const [anchorEl, setAnchorEl] = useState(null)
+  
+  // Pages that should be full-width (no container)
+  const fullWidthPages = ['/', '/search', '/results', '/booking']
+  const isFullWidth = fullWidthPages.some(path => location.pathname === path || location.pathname.startsWith(path + '/'))
 
   const handleMenuOpen = (event) => {
     setAnchorEl(event.currentTarget)
@@ -67,7 +76,23 @@ const Layout = ({ children }) => {
             Airport Project
           </Typography>
           <Button color="inherit" component={RouterLink} to="/search" sx={{ mr: 2 }}>
-            Search Flights
+            {t('searchFlights', language)}
+          </Button>
+          <Button 
+            component="a"
+            href="/chat/"
+            className="ai-chat-button"
+            startIcon={<SmartToy />}
+            sx={{ mr: 2 }}
+          >
+            {t('aiChat', language)}
+          </Button>
+          <Button 
+            color="inherit" 
+            onClick={toggleLanguage}
+            sx={{ mr: 2, minWidth: '80px' }}
+          >
+            {language === 'uk' ? '🇺🇦 UKR' : '🇺🇸 ENG'} {currencySymbol}
           </Button>
           {user ? (
             <>
@@ -88,15 +113,15 @@ const Layout = ({ children }) => {
                 onClose={handleMenuClose}
               >
                 <MenuItem component={RouterLink} to="/dashboard" onClick={handleMenuClose}>
-                  Dashboard
+                  {t('dashboard', language)}
                 </MenuItem>
-                <MenuItem onClick={handleLogout}>Logout</MenuItem>
+                <MenuItem onClick={handleLogout}>{t('logout', language)}</MenuItem>
               </Menu>
             </>
           ) : (
             <>
               <Button color="inherit" component={RouterLink} to="/login" sx={{ mr: 1 }}>
-                Login
+                {t('login', language)}
               </Button>
               <Button
                 color="inherit"
@@ -105,15 +130,21 @@ const Layout = ({ children }) => {
                 variant="outlined"
                 sx={{ borderColor: 'rgba(255,255,255,0.5)' }}
               >
-                Register
+                {t('register', language)}
               </Button>
             </>
           )}
         </Toolbar>
       </AppBar>
-      <Box sx={{ flex: 1, width: '100%', py: 4 }}>
-        {children}
-      </Box>
+      {isFullWidth ? (
+        <Box sx={{ flex: 1 }}>
+          {children}
+        </Box>
+      ) : (
+        <Container maxWidth="xl" sx={{ flex: 1, py: 4 }}>
+          {children}
+        </Container>
+      )}
       <Box
         component="footer"
         className="footer"

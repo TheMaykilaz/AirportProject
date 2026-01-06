@@ -51,7 +51,7 @@ urlpatterns = [
     
     # React app - catch all routes and serve React app
     # This should be last to catch all non-API routes
-    re_path(r'^(?!api|admin|swagger|redoc|auth|logout|hotels|search).*$', ReactAppView.as_view(), name='react-app'),
+    re_path(r'^(?!api|admin|swagger|redoc|auth|logout|hotels|search|chat).*$', ReactAppView.as_view(), name='react-app'),
 ]
 
 # Serve static files in development

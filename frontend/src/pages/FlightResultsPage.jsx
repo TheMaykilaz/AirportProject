@@ -18,6 +18,9 @@ const FlightResultsPage = () => {
     layoverDuration: 24,
     noOvernightLayovers: false,
     convenientLayovers: false,
+    sortBy: 'price', // 'price' or 'duration'
+    directFlightsOnly: false,
+    noVisaRequired: false,
   })
 
   useEffect(() => {
@@ -182,7 +185,62 @@ const FlightResultsPage = () => {
     )
   }
 
-  const allFlights = [...flights, ...returnFlights]
+  // Apply filters and sorting
+  const applyFiltersAndSort = (flightList) => {
+    let filtered = [...flightList]
+
+    // Filter: Direct flights only
+    if (filters.directFlightsOnly) {
+      filtered = filtered.filter(flight => {
+        // Assuming direct flights have no layovers (you may need to adjust based on your data structure)
+        return !flight.has_layovers || flight.layover_count === 0
+      })
+    }
+
+    // Filter: No visa required
+    if (filters.noVisaRequired) {
+      filtered = filtered.filter(flight => {
+        // This would need to be based on your flight data structure
+        // For now, we'll assume all flights pass this filter
+        return true
+      })
+    }
+
+    // Filter: No overnight layovers
+    if (filters.noOvernightLayovers) {
+      filtered = filtered.filter(flight => {
+        // Check if flight has overnight layovers
+        return !flight.has_overnight_layover
+      })
+    }
+
+    // Sort
+    if (filters.sortBy === 'price') {
+      filtered.sort((a, b) => parseFloat(a.min_price) - parseFloat(b.min_price))
+    } else if (filters.sortBy === 'duration') {
+      filtered.sort((a, b) => {
+        const durationA = calculateTotalDurationMinutes(a.departure_time, a.arrival_time)
+        const durationB = calculateTotalDurationMinutes(b.departure_time, b.arrival_time)
+        return durationA - durationB
+      })
+    }
+
+    return filtered
+  }
+
+  const calculateTotalDurationMinutes = (departureTime, arrivalTime) => {
+    try {
+      const dep = parseISO(departureTime)
+      const arr = parseISO(arrivalTime)
+      return differenceInMinutes(arr, dep)
+    } catch {
+      return 0
+    }
+  }
+
+  const filteredFlights = applyFiltersAndSort(flights)
+  const filteredReturnFlights = applyFiltersAndSort(returnFlights)
+  const allFlights = [...filteredFlights, ...filteredReturnFlights]
   const displayFlight = selectedFlight || (allFlights.length > 0 ? allFlights[0] : null)
 
   return (
@@ -228,6 +286,56 @@ const FlightResultsPage = () => {
             <button className="save-search-btn" onClick={() => alert('Search saved!')}>
               ❤️ Save search
             </button>
+
+            <div className="sidebar-section">
+              <h3>Сортування</h3>
+              <div className="filter-option">
+                <input 
+                  type="radio" 
+                  id="sort_price" 
+                  name="sortBy"
+                  checked={filters.sortBy === 'price'}
+                  onChange={() => handleFilterChange('sortBy', 'price')}
+                />
+                <label htmlFor="sort_price">
+                  <span>Фільтрувати по ціні (найменша спочатку)</span>
+                </label>
+              </div>
+              <div className="filter-option">
+                <input 
+                  type="radio" 
+                  id="sort_duration" 
+                  name="sortBy"
+                  checked={filters.sortBy === 'duration'}
+                  onChange={() => handleFilterChange('sortBy', 'duration')}
+                />
+                <label htmlFor="sort_duration">
+                  <span>Фільтрувати по часу подорожі (найшвидше спочатку)</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="sidebar-section">
+              <h3>Тип рейсу</h3>
+              <div className="toggle-switch">
+                <input 
+                  type="checkbox" 
+                  id="direct_flights_only"
+                  checked={filters.directFlightsOnly}
+                  onChange={(e) => handleFilterChange('directFlightsOnly', e.target.checked)}
+                />
+                <label htmlFor="direct_flights_only">Тільки прямі рейси</label>
+              </div>
+              <div className="toggle-switch">
+                <input 
+                  type="checkbox" 
+                  id="no_visa_required"
+                  checked={filters.noVisaRequired}
+                  onChange={(e) => handleFilterChange('noVisaRequired', e.target.checked)}
+                />
+                <label htmlFor="no_visa_required">Без додаткової візи під час польоту</label>
+              </div>
+            </div>
 
             <div className="sidebar-section">
               <h3>Baggage</h3>
@@ -307,8 +415,8 @@ const FlightResultsPage = () => {
                 <h3 className="section-title">
                   {departureCity} — {arrivalCity}
                 </h3>
-                {flights.map((flight) => {
-                  const badge = getBadge(flight, flights)
+                {filteredFlights.map((flight) => {
+                  const badge = getBadge(flight, filteredFlights)
                   const totalDuration = calculateTotalDuration(flight.departure_time, flight.arrival_time)
                   const flightTime = calculateFlightTime(flight.departure_time, flight.arrival_time)
                   
@@ -381,7 +489,7 @@ const FlightResultsPage = () => {
                 <h3 className="section-title">
                   {arrivalCity} — {departureCity}
                 </h3>
-                {returnFlights.map((flight) => {
+                {filteredReturnFlights.map((flight) => {
                   const totalDuration = calculateTotalDuration(flight.departure_time, flight.arrival_time)
                   const flightTime = calculateFlightTime(flight.departure_time, flight.arrival_time)
                   
