@@ -1,0 +1,269 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.flight-search-container {
+  max-width: 1200px;
+  margin: -32px auto 0;
+  padding: 40px 20px;
+  min-height: calc(100vh - 200px);
+  background: #0b57d0;
+  width: 100vw;
+  position: relative;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+}
+
+.search-title {
+  text-align: center;
+  color: white;
+  font-size: 48px;
+  font-weight: 700;
+  margin-bottom: 40px;
+}
+
+.tabs {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: 30px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 4px;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: transparent;
+  border: none;
+  color: #87ceeb;
+  cursor: pointer;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.tab.active {
+  background: white;
+  color: #0b57d0;
+}
+
+.tab-icon {
+  font-size: 20px;
+}
+
+.search-form-container {
+  background: white;
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.search-form {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.form-field {
+  flex: 1;
+  min-width: 150px;
+  position: relative;
+}
+
+.form-field.departure,
+.form-field.arrival {
+  flex: 1.2;
+}
+
+.form-field.dates {
+  flex: 0.9;
+}
+
+.form-field.passengers {
+  flex: 0.8;
+}
+
+.form-field label {
+  display: block;
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.form-field input,
+.form-field select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  background: white;
+}
+
+.form-field input:focus,
+.form-field select:focus {
+  outline: none;
+  border-color: #0b57d0;
+}
+
+.airport-code {
+  font-size: 12px;
+  color: #999;
+  margin-top: 2px;
+}
+
+.swap-button {
+  background: #f0f0f0;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  transition: all 0.2s;
+  margin-top: 20px;
+}
+
+.swap-button:hover {
+  background: #e0e0e0;
+}
+
+.date-clear {
+  position: absolute;
+  right: 8px;
+  top: 32px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  color: #999;
+  padding: 4px;
+}
+
+.date-clear:hover {
+  color: #333;
+}
+
+.passenger-dropdown {
+  position: relative;
+}
+
+.passenger-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  background: white;
+}
+
+.passenger-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.passenger-count {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+}
+
+.passenger-class {
+  font-size: 12px;
+  color: #666;
+}
+
+.dropdown-arrow {
+  color: #999;
+}
+
+.multi-city-link {
+  color: #0b57d0;
+  text-decoration: none;
+  font-size: 14px;
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.multi-city-link:hover {
+  text-decoration: underline;
+}
+
+.search-button-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: 20px;
+}
+
+.search-button {
+  background: #ff6b35;
+  color: white;
+  border: none;
+  padding: 16px 48px;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.search-button:hover {
+  background: #e55a2b;
+}
+
+.booking-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.booking-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.booking-checkbox label {
+  font-size: 14px;
+  color: #666;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .search-form {
+    flex-direction: column;
+  }
+  .form-field {
+    width: 100%;
+  }
+  .swap-button {
+    transform: rotate(90deg);
+    margin: 10px 0;
+  }
+}
+

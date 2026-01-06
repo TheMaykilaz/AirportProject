@@ -1,19 +1,9 @@
 import { useState, useEffect } from 'react'
-import {
-  Box,
-  Typography,
-  Card,
-  CardContent,
-  Grid,
-  Button,
-  CircularProgress,
-  Alert,
-  TextField,
-  Paper,
-} from '@mui/material'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { flightAPI, bookingAPI, paymentAPI } from '../services/api'
+import { format, parseISO } from 'date-fns'
+import './BookingPage.css'
 
 const BookingPage = () => {
   const { flightId } = useParams()
@@ -21,10 +11,13 @@ const BookingPage = () => {
   const { user } = useAuth()
   const [flight, setFlight] = useState(null)
   const [seatMap, setSeatMap] = useState(null)
-  const [selectedSeats, setSelectedSeats] = useState([])
+  const [selectedSeats, setSelectedSeats] = useState({}) // { passengerIndex: seatNumber }
   const [loading, setLoading] = useState(true)
   const [booking, setBooking] = useState(false)
   const [error, setError] = useState(null)
+  const [passengers, setPassengers] = useState([{ name: user?.email?.split('@')[0] || 'Passenger 1', seat: null }])
+  const [currentStep, setCurrentStep] = useState(1)
+  const totalSteps = 4
 
   useEffect(() => {
     if (!user) {
@@ -42,6 +35,15 @@ const BookingPage = () => {
       ])
       setFlight(flightResponse.data)
       setSeatMap(seatMapResponse.data)
+      
+      // Initialize passengers based on search params or default to 1
+      const urlParams = new URLSearchParams(window.location.search)
+      const passengerCount = parseInt(urlParams.get('passengers') || '1')
+      const initialPassengers = Array.from({ length: passengerCount }, (_, i) => ({
+        name: user?.email?.split('@')[0] || `Passenger ${i + 1}`,
+        seat: null
+      }))
+      setPassengers(initialPassengers)
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load flight data')
     } finally {
@@ -49,18 +51,95 @@ const BookingPage = () => {
     }
   }
 
-  const handleSeatSelect = (seatNumber) => {
-    setSelectedSeats((prev) => {
-      if (prev.includes(seatNumber)) {
-        return prev.filter((s) => s !== seatNumber)
+  // Parse seat map into rows and columns
+  const parseSeatMap = () => {
+    if (!seatMap?.seat_map) return { rows: [], seatColumns: [] }
+    
+    const seatColumns = ['A', 'B', 'C', 'H', 'J', 'K'] // 3-3 configuration
+    const seatMapByRow = {}
+    
+    seatMap.seat_map.forEach(seat => {
+      const match = seat.seat_number.match(/^(\d+)([A-Z]+)$/)
+      if (match) {
+        const row = parseInt(match[1])
+        const col = match[2]
+        
+        if (!seatMapByRow[row]) {
+          seatMapByRow[row] = {}
+        }
+        seatMapByRow[row][col] = {
+          ...seat,
+          row,
+          col
+        }
       }
-      return [...prev, seatNumber]
+    })
+    
+    const rows = Object.keys(seatMapByRow)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .map(row => ({
+        rowNumber: row,
+        seats: seatColumns.map(col => seatMapByRow[row]?.[col] || null)
+      }))
+    
+    return { rows, seatColumns }
+  }
+
+  const handleSeatSelect = (seatNumber, passengerIndex) => {
+    if (!seatNumber) return
+    
+    const seat = seatMap.seat_map.find(s => s.seat_number === seatNumber)
+    if (!seat || seat.status !== 'available') return
+    
+    setSelectedSeats(prev => {
+      const newSeats = { ...prev }
+      
+      // Remove seat from other passengers if selected
+      Object.keys(newSeats).forEach(key => {
+        if (newSeats[key] === seatNumber) {
+          delete newSeats[key]
+        }
+      })
+      
+      // Assign to current passenger
+      if (prev[passengerIndex] === seatNumber) {
+        // Deselect if clicking same seat
+        delete newSeats[passengerIndex]
+        setPassengers(prevPass => {
+          const updated = [...prevPass]
+          updated[passengerIndex].seat = null
+          return updated
+        })
+      } else {
+        newSeats[passengerIndex] = seatNumber
+        setPassengers(prevPass => {
+          const updated = [...prevPass]
+          updated[passengerIndex].seat = seatNumber
+          return updated
+        })
+      }
+      
+      return newSeats
     })
   }
 
+  const handleNext = async () => {
+    if (currentStep < totalSteps) {
+      if (currentStep === totalSteps - 1) {
+        // Last step - proceed to booking
+        await handleBooking()
+      } else {
+        setCurrentStep(prev => prev + 1)
+      }
+    }
+  }
+
   const handleBooking = async () => {
-    if (selectedSeats.length === 0) {
-      setError('Please select at least one seat')
+    const seatNumbers = Object.values(selectedSeats).filter(Boolean)
+    
+    if (seatNumbers.length === 0) {
+      setError('Будь ласка, оберіть місце для кожного пасажира')
       return
     }
 
@@ -70,7 +149,7 @@ const BookingPage = () => {
     try {
       const bookingResponse = await bookingAPI.createBooking({
         flight_id: parseInt(flightId),
-        seat_numbers: selectedSeats,
+        seat_numbers: seatNumbers,
       })
 
       const paymentResponse = await paymentAPI.createCheckoutSession(
@@ -88,210 +167,197 @@ const BookingPage = () => {
     }
   }
 
+  const formatTime = (timeString) => {
+    try {
+      return format(parseISO(timeString), 'HH:mm')
+    } catch {
+      return timeString
+    }
+  }
+
+  const formatDate = (dateString) => {
+    try {
+      return format(parseISO(dateString), 'd MMM')
+    } catch {
+      return dateString
+    }
+  }
+
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress />
-      </Box>
+      <div className="booking-page-container">
+        <div className="loading-spinner">Завантаження...</div>
+      </div>
     )
   }
 
   if (error && !flight) {
-    return <Alert severity="error">{error}</Alert>
+    return (
+      <div className="booking-page-container">
+        <div className="error-message">{error}</div>
+      </div>
+    )
   }
 
+  const { rows, seatColumns } = parseSeatMap()
+  const activePassengerIndex = passengers.findIndex(p => !p.seat)
+
   return (
-    <Box>
-      <Typography variant="h4" gutterBottom fontWeight="bold" sx={{ mb: 4 }}>
-        Complete Your Booking
-      </Typography>
+    <div className="booking-page-container">
+      {/* Header */}
+      <div className="booking-header">
+        <div className="header-content">
+          <h1 className="header-title">Забронювати місце</h1>
+          {flight && (
+            <div className="header-flight-info">
+              <span className="flight-route">
+                {flight.departure_city} - {flight.arrival_city}
+              </span>
+              <span className="flight-details">
+                Рейс {currentStep} з {totalSteps} ({flight.departure_airport_code} - {flight.arrival_airport_code})
+              </span>
+            </div>
+          )}
+        </div>
+        <button className="close-btn" onClick={() => navigate('/results')}>×</button>
+      </div>
 
-      {flight && (
-        <Grid container spacing={4}>
-          <Grid item xs={12} md={8}>
-            <Card sx={{ mb: 3 }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom fontWeight="bold">
-                  Flight Details
-                </Typography>
-                <Grid container spacing={2} sx={{ mt: 1 }}>
-                  <Grid item xs={6}>
-                    <Typography variant="body2" color="text.secondary">
-                      Airline
-                    </Typography>
-                    <Typography variant="body1" fontWeight="bold">
-                      {flight.airline_name || 'N/A'}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Typography variant="body2" color="text.secondary">
-                      Flight Number
-                    </Typography>
-                    <Typography variant="body1" fontWeight="bold">
-                      {flight.flight_number}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Typography variant="body2" color="text.secondary">
-                      Departure
-                    </Typography>
-                    <Typography variant="body1" fontWeight="bold">
-                      {flight.departure_airport_code} - {flight.departure_city}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Typography variant="body2" color="text.secondary">
-                      Arrival
-                    </Typography>
-                    <Typography variant="body1" fontWeight="bold">
-                      {flight.arrival_airport_code} - {flight.arrival_city}
-                    </Typography>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
+      {/* Main Content */}
+      <div className="booking-main-content">
+        {/* Left Panel - Passenger Information */}
+        <aside className="passenger-panel">
+          <h2 className="panel-title">Інформація про пасажира</h2>
+          {passengers.map((passenger, index) => (
+            <div 
+              key={index} 
+              className={`passenger-card ${activePassengerIndex === index ? 'active' : ''}`}
+            >
+              <div className="passenger-icon">👤</div>
+              <div className="passenger-info">
+                <div className="passenger-name">{passenger.name}</div>
+                <div className="passenger-status">
+                  {passenger.seat ? `Місце: ${passenger.seat}` : 'Не вибрано'}
+                </div>
+              </div>
+            </div>
+          ))}
+        </aside>
 
-            {seatMap && (
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom fontWeight="bold">
-                    Select Seats
-                  </Typography>
-                  {error && (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                      {error}
-                    </Alert>
-                  )}
-                  <Box sx={{ mt: 2 }}>
-                    <Grid container spacing={1}>
-                      {seatMap.seat_map?.map((seat) => (
-                        <Grid item key={seat.seat_number}>
-                          <Button
-                            variant={
-                              selectedSeats.includes(seat.seat_number)
-                                ? 'contained'
-                                : seat.status === 'available'
-                                ? 'outlined'
-                                : 'disabled'
-                            }
-                            onClick={() =>
-                              seat.status === 'available' &&
-                              handleSeatSelect(seat.seat_number)
-                            }
-                            disabled={seat.status !== 'available'}
-                            sx={{
-                              minWidth: 60,
-                              bgcolor:
-                                selectedSeats.includes(seat.seat_number)
-                                  ? 'primary.main'
-                                  : seat.status === 'available'
-                                  ? 'transparent'
-                                  : 'grey.300',
-                            }}
-                          >
-                            {seat.seat_number}
-                          </Button>
-                        </Grid>
-                      ))}
-                    </Grid>
-                    <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Box
-                          sx={{
-                            width: 20,
-                            height: 20,
-                            border: '1px solid',
-                            borderColor: 'primary.main',
-                            mr: 1,
-                          }}
-                        />
-                        <Typography variant="body2">Available</Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Box
-                          sx={{
-                            width: 20,
-                            height: 20,
-                            bgcolor: 'grey.300',
-                            mr: 1,
-                          }}
-                        />
-                        <Typography variant="body2">Occupied</Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Box
-                          sx={{
-                            width: 20,
-                            height: 20,
-                            bgcolor: 'primary.main',
-                            mr: 1,
-                          }}
-                        />
-                        <Typography variant="body2">Selected</Typography>
-                      </Box>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            )}
-          </Grid>
+        {/* Middle Panel - Seat Map */}
+        <main className="seat-map-panel">
+          <h2 className="panel-title">Seat Map</h2>
+          <div className="seat-map-container">
+            <div className="seat-map-header">
+              <div className="seat-columns-header">
+                <div className="seat-column-spacer"></div>
+                {seatColumns.map(col => (
+                  <div key={col} className="seat-column-label">
+                    {col}
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="seat-map-rows">
+              {rows.map(({ rowNumber, seats }) => (
+                <div key={rowNumber} className="seat-row">
+                  <div className="row-number">{rowNumber}</div>
+                  <div className="seat-columns">
+                    {seats.map((seat, colIndex) => {
+                      const col = seatColumns[colIndex]
+                      const seatNumber = seat ? seat.seat_number : null
+                      const isSelected = Object.values(selectedSeats).includes(seatNumber)
+                      const isAssignedToPassenger = Object.entries(selectedSeats).find(
+                        ([idx, sn]) => sn === seatNumber
+                      )
+                      const passengerIndex = isAssignedToPassenger ? parseInt(isAssignedToPassenger[0]) : null
+                      
+                      // Check if this is an aisle
+                      if (colIndex === 3) {
+                        return <div key={`aisle-${rowNumber}`} className="aisle-spacer"></div>
+                      }
+                      
+                      if (!seat) {
+                        return <div key={`empty-${rowNumber}-${col}`} className="seat-empty"></div>
+                      }
+                      
+                      const seatStatus = seat.status || 'available'
+                      const isAvailable = seatStatus === 'available'
+                      const isUnavailable = seatStatus === 'booked' || seatStatus === 'reserved'
+                      
+                      return (
+                        <button
+                          key={seatNumber}
+                          className={`seat-button ${
+                            isSelected ? 'selected' : 
+                            isUnavailable ? 'unavailable' : 
+                            'available'
+                          } ${activePassengerIndex === passengerIndex ? 'assigned-to-active' : ''}`}
+                          onClick={() => handleSeatSelect(seatNumber, activePassengerIndex >= 0 ? activePassengerIndex : 0)}
+                          disabled={!isAvailable || isSelected}
+                          title={seatNumber}
+                        >
+                          {isUnavailable ? '✕' : seatNumber.slice(-1)}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </main>
 
-          <Grid item xs={12} md={4}>
-            <Paper sx={{ p: 3, position: 'sticky', top: 20 }}>
-              <Typography variant="h6" gutterBottom fontWeight="bold">
-                Booking Summary
-              </Typography>
-              <Box sx={{ my: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2">Seats Selected:</Typography>
-                  <Typography variant="body2" fontWeight="bold">
-                    {selectedSeats.length}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2">Price per seat:</Typography>
-                  <Typography variant="body2" fontWeight="bold">
-                    ${parseFloat(flight.base_price || 0).toFixed(2)}
-                  </Typography>
-                </Box>
-                <Box
-                  sx={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    mt: 2,
-                    pt: 2,
-                    borderTop: '2px solid',
-                    borderColor: 'divider',
-                  }}
-                >
-                  <Typography variant="h6" fontWeight="bold">
-                    Total:
-                  </Typography>
-                  <Typography variant="h6" fontWeight="bold" color="primary">
-                    ${(parseFloat(flight.base_price || 0) * selectedSeats.length).toFixed(2)}
-                  </Typography>
-                </Box>
-              </Box>
-              <Button
-                variant="contained"
-                fullWidth
-                size="large"
-                onClick={handleBooking}
-                disabled={booking || selectedSeats.length === 0}
-                sx={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  mt: 2,
-                }}
-              >
-                {booking ? <CircularProgress size={24} /> : 'Proceed to Payment'}
-              </Button>
-            </Paper>
-          </Grid>
-        </Grid>
-      )}
-    </Box>
+        {/* Right Panel - Legend */}
+        <aside className="legend-panel">
+          <h2 className="panel-title">Пояснення до схеми місць</h2>
+          <div className="legend-items">
+            <div className="legend-item">
+              <div className="legend-icon available-icon"></div>
+              <div className="legend-content">
+                <div className="legend-title">Стандартне сидіння</div>
+                <div className="legend-arrow">▼</div>
+              </div>
+            </div>
+            <div className="legend-item">
+              <div className="legend-icon unavailable-icon">✕</div>
+              <div className="legend-content">
+                <div className="legend-title">Недоступно</div>
+                <div className="legend-arrow">▼</div>
+              </div>
+            </div>
+            <div className="legend-item">
+              <div className="legend-icon selected-icon"></div>
+              <div className="legend-content">
+                <div className="legend-title">Вибрано</div>
+                <div className="legend-arrow">▼</div>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      {/* Bottom Navigation */}
+      <div className="booking-navigation">
+        <button 
+          className="nav-button back-button" 
+          onClick={() => currentStep > 1 ? setCurrentStep(prev => prev - 1) : navigate('/results')}
+        >
+          Назад
+        </button>
+        {error && (
+          <div className="error-banner">{error}</div>
+        )}
+        <button 
+          className="nav-button next-button" 
+          onClick={handleNext}
+          disabled={booking || Object.values(selectedSeats).filter(Boolean).length < passengers.length}
+        >
+          {booking ? 'Обробка...' : 'Далі'}
+        </button>
+      </div>
+    </div>
   )
 }
 
 export default BookingPage
-

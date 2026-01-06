@@ -1,20 +1,8 @@
 import { useState, useEffect } from 'react'
-import {
-  Box,
-  Typography,
-  Card,
-  CardContent,
-  Grid,
-  Button,
-  CircularProgress,
-  Alert,
-  Chip,
-  Paper,
-} from '@mui/material'
-import { FlightTakeoff, AccessTime, People } from '@mui/icons-material'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, differenceInHours, differenceInMinutes } from 'date-fns'
 import { flightAPI } from '../services/api'
+import './FlightResultsPage.css'
 
 const FlightResultsPage = () => {
   const [searchParams] = useSearchParams()
@@ -24,6 +12,13 @@ const FlightResultsPage = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [priceStats, setPriceStats] = useState(null)
+  const [selectedFlight, setSelectedFlight] = useState(null)
+  const [filters, setFilters] = useState({
+    baggageIncluded: false,
+    layoverDuration: 24,
+    noOvernightLayovers: false,
+    convenientLayovers: false,
+  })
 
   useEffect(() => {
     searchFlights()
@@ -34,15 +29,39 @@ const FlightResultsPage = () => {
     setError(null)
     try {
       const params = Object.fromEntries(searchParams.entries())
+      // Convert city names to airport codes if needed
+      if (params.departure_city && !params.departure_airport_code) {
+        params.departure_airport_code = getAirportCode(params.departure_city)
+      }
+      if (params.arrival_city && !params.arrival_airport_code) {
+        params.arrival_airport_code = getAirportCode(params.arrival_city)
+      }
+      
       const response = await flightAPI.search(params)
       setFlights(response.data.results || [])
       setReturnFlights(response.data.return_results || [])
       setPriceStats(response.data.price_stats)
+      // Auto-select first flight for booking sidebar
+      if (response.data.results && response.data.results.length > 0) {
+        setSelectedFlight(response.data.results[0])
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to search flights')
     } finally {
       setLoading(false)
     }
+  }
+
+  const getAirportCode = (city) => {
+    const codes = {
+      'krakow': 'KRK', 'kraków': 'KRK',
+      'tashkent': 'TAS',
+      'london': 'LHR', 'lhr': 'LHR',
+      'new york': 'JFK', 'jfk': 'JFK',
+      'paris': 'CDG', 'cdg': 'CDG',
+      'harbin': 'HRB', 'phuket': 'HKT'
+    }
+    return codes[city.toLowerCase()] || city.toUpperCase().slice(0, 3)
   }
 
   const formatTime = (timeString) => {
@@ -53,186 +72,421 @@ const FlightResultsPage = () => {
     }
   }
 
+  const formatDate = (dateString) => {
+    try {
+      return format(parseISO(dateString), 'EEE d MMM')
+    } catch {
+      return dateString
+    }
+  }
+
+  const formatDateShort = (dateString) => {
+    try {
+      return format(parseISO(dateString), 'd MMM')
+    } catch {
+      return dateString
+    }
+  }
+
   const formatDuration = (duration) => {
     if (!duration) return 'N/A'
     const parts = duration.split(':')
     if (parts.length >= 2) {
-      return `${parts[0]}h ${parts[1]}m`
+      const hours = parseInt(parts[0])
+      const minutes = parseInt(parts[1])
+      if (hours > 0 && minutes > 0) {
+        return `${hours} год. ${minutes} хв.`
+      } else if (hours > 0) {
+        return `${hours} год.`
+      } else {
+        return `${minutes} хв.`
+      }
     }
     return duration
   }
 
-  const FlightCard = ({ flight, isReturn = false }) => (
-    <Card sx={{ mb: 3, '&:hover': { boxShadow: 6 } }}>
-      <CardContent>
-        <Grid container spacing={3} alignItems="center">
-          <Grid item xs={12} md={8}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <FlightTakeoff sx={{ mr: 1, color: 'primary.main' }} />
-              <Typography variant="h6" fontWeight="bold">
-                {flight.airline_name}
-              </Typography>
-              <Chip
-                label={flight.airline_code}
-                size="small"
-                sx={{ ml: 2 }}
-              />
-            </Box>
-            <Grid container spacing={2}>
-              <Grid item xs={6} sm={3}>
-                <Typography variant="body2" color="text.secondary">
-                  Departure
-                </Typography>
-                <Typography variant="h6" fontWeight="bold">
-                  {formatTime(flight.departure_time)}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {flight.departure_airport_code} - {flight.departure_city}
-                </Typography>
-              </Grid>
-              <Grid item xs={6} sm={3}>
-                <Typography variant="body2" color="text.secondary">
-                  Arrival
-                </Typography>
-                <Typography variant="h6" fontWeight="bold">
-                  {formatTime(flight.arrival_time)}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {flight.arrival_airport_code} - {flight.arrival_city}
-                </Typography>
-              </Grid>
-              <Grid item xs={6} sm={3}>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <AccessTime sx={{ mr: 0.5, fontSize: 18 }} />
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">
-                      Duration
-                    </Typography>
-                    <Typography variant="body1" fontWeight="bold">
-                      {formatDuration(flight.duration_formatted)}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Grid>
-              <Grid item xs={6} sm={3}>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <People sx={{ mr: 0.5, fontSize: 18 }} />
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">
-                      Available Seats
-                    </Typography>
-                    <Typography variant="body1" fontWeight="bold">
-                      {flight.available_seats}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Grid>
-            </Grid>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Box sx={{ textAlign: { xs: 'left', md: 'right' } }}>
-              <Typography variant="h4" fontWeight="bold" color="primary">
-                ${parseFloat(flight.min_price).toFixed(2)}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                per person
-              </Typography>
-              <Button
-                variant="contained"
-                fullWidth
-                onClick={() => navigate(`/booking/${flight.flight_id}`)}
-                sx={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                }}
-              >
-                Book Now
-              </Button>
-            </Box>
-          </Grid>
-        </Grid>
-      </CardContent>
-    </Card>
-  )
+  const calculateTotalDuration = (departureTime, arrivalTime) => {
+    try {
+      const dep = parseISO(departureTime)
+      const arr = parseISO(arrivalTime)
+      const totalHours = differenceInHours(arr, dep)
+      const totalMinutes = differenceInMinutes(arr, dep) % 60
+      
+      if (totalHours >= 24) {
+        const days = Math.floor(totalHours / 24)
+        const hours = totalHours % 24
+        return `${days} д. ${hours} год. ${totalMinutes} хв.`
+      }
+      return `${totalHours} год. ${totalMinutes} хв.`
+    } catch {
+      return 'N/A'
+    }
+  }
+
+  const calculateFlightTime = (departureTime, arrivalTime) => {
+    try {
+      const dep = parseISO(departureTime)
+      const arr = parseISO(arrivalTime)
+      const hours = differenceInHours(arr, dep)
+      const minutes = differenceInMinutes(arr, dep) % 60
+      return `${hours} год. ${minutes} хв.`
+    } catch {
+      return 'N/A'
+    }
+  }
+
+  const getBadge = (flight, allFlights) => {
+    if (!allFlights || allFlights.length === 0) return null
+    
+    const cheapest = allFlights.reduce((min, f) => 
+      parseFloat(f.min_price) < parseFloat(min.min_price) ? f : min, allFlights[0])
+    
+    if (flight.flight_id === cheapest.flight_id) {
+      return { type: 'cheapest', text: 'Cheapest' }
+    }
+    
+    return null
+  }
+
+  const handleFilterChange = (filterName, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterName]: value
+    }))
+  }
+
+  const buyFlight = (flight) => {
+    navigate(`/booking/${flight.flight_id}`)
+  }
+
+  const departureCity = searchParams.get('departure_city') || searchParams.get('departure_airport_code') || 'Krakow'
+  const arrivalCity = searchParams.get('arrival_city') || searchParams.get('arrival_airport_code') || 'Tashkent'
+  const departureDate = searchParams.get('departure_date') || ''
+  const returnDate = searchParams.get('return_date') || ''
+  const passengers = searchParams.get('passengers') || '1'
+  const flightClass = searchParams.get('class') || 'Economy'
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress />
-      </Box>
+      <div className="flight-results-container">
+        <div className="loading-spinner">Loading flights...</div>
+      </div>
     )
   }
 
   if (error) {
-    return <Alert severity="error">{error}</Alert>
+    return (
+      <div className="flight-results-container">
+        <div className="error-message">{error}</div>
+      </div>
+    )
   }
 
+  const allFlights = [...flights, ...returnFlights]
+  const displayFlight = selectedFlight || (allFlights.length > 0 ? allFlights[0] : null)
+
   return (
-    <Box>
-      <Typography variant="h4" gutterBottom fontWeight="bold" sx={{ mb: 4 }}>
-        Flight Results
-      </Typography>
-
-      {priceStats && (
-        <Paper sx={{ p: 3, mb: 4, bgcolor: 'primary.light', color: 'white' }}>
-          <Grid container spacing={4}>
-            <Grid item xs={6} sm={3}>
-              <Typography variant="body2">Cheapest</Typography>
-              <Typography variant="h5" fontWeight="bold">
-                ${parseFloat(priceStats.min).toFixed(2)}
-              </Typography>
-            </Grid>
-            <Grid item xs={6} sm={3}>
-              <Typography variant="body2">Most Expensive</Typography>
-              <Typography variant="h5" fontWeight="bold">
-                ${parseFloat(priceStats.max).toFixed(2)}
-              </Typography>
-            </Grid>
-            <Grid item xs={6} sm={3}>
-              <Typography variant="body2">Average</Typography>
-              <Typography variant="h5" fontWeight="bold">
-                ${parseFloat(priceStats.average).toFixed(2)}
-              </Typography>
-            </Grid>
-            <Grid item xs={6} sm={3}>
-              <Typography variant="body2">Total Flights</Typography>
-              <Typography variant="h5" fontWeight="bold">
-                {flights.length + returnFlights.length}
-              </Typography>
-            </Grid>
-          </Grid>
-        </Paper>
-      )}
-
-      {flights.length === 0 && returnFlights.length === 0 ? (
-        <Alert severity="info">No flights found. Try adjusting your search criteria.</Alert>
-      ) : (
-        <>
-          {flights.length > 0 && (
-            <Box sx={{ mb: 4 }}>
-              <Typography variant="h5" gutterBottom fontWeight="bold">
-                Outbound Flights
-              </Typography>
-              {flights.map((flight) => (
-                <FlightCard key={flight.flight_id} flight={flight} />
-              ))}
-            </Box>
+    <div className="flight-results-container">
+      <div className="top-bar">
+        <div className="search-params">
+          <div className="param-item">
+            <span>{departureCity}</span>
+            <span className="param-value">{getAirportCode(departureCity)}</span>
+          </div>
+          <span>→</span>
+          <div className="param-item">
+            <span>{arrivalCity}</span>
+            <span className="param-value">{getAirportCode(arrivalCity)}</span>
+          </div>
+          {departureDate && (
+            <div className="param-item">
+              <span>{formatDate(departureDate)}</span>
+            </div>
           )}
-
-          {returnFlights.length > 0 && (
-            <Box>
-              <Typography variant="h5" gutterBottom fontWeight="bold">
-                Return Flights
-              </Typography>
-              {returnFlights.map((flight) => (
-                <FlightCard key={flight.flight_id} flight={flight} isReturn />
-              ))}
-            </Box>
+          {returnDate && (
+            <div className="param-item">
+              <span>{formatDate(returnDate)}</span>
+            </div>
           )}
-        </>
-      )}
-    </Box>
+          <div className="param-item">
+            <span>{passengers} passenger{passengers !== '1' ? 's' : ''} {flightClass}</span>
+          </div>
+        </div>
+        <div>
+          <button className="search-again-btn" onClick={() => navigate('/search')}>
+            Search flights
+          </button>
+          <a href="#" className="multi-city-link" onClick={(e) => e.preventDefault()}>
+            Create multi-city route
+          </a>
+        </div>
+      </div>
+
+      <div className="main-content-wrapper">
+        <div className="main-content">
+          <aside className="sidebar">
+            <button className="save-search-btn" onClick={() => alert('Search saved!')}>
+              ❤️ Save search
+            </button>
+
+            <div className="sidebar-section">
+              <h3>Baggage</h3>
+              <div className="filter-option">
+                <input 
+                  type="checkbox" 
+                  id="baggage_included" 
+                  checked={filters.baggageIncluded}
+                  onChange={(e) => handleFilterChange('baggageIncluded', e.target.checked)}
+                />
+                <label htmlFor="baggage_included">
+                  <span>Baggage included</span>
+                  {priceStats && <span className="filter-price">${parseFloat(priceStats.max).toFixed(0)}</span>}
+                </label>
+              </div>
+            </div>
+
+            <div className="sidebar-section">
+              <h3>Layovers</h3>
+              <div className="slider-container">
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="24" 
+                  value={filters.layoverDuration}
+                  className="slider" 
+                  onChange={(e) => handleFilterChange('layoverDuration', parseInt(e.target.value))}
+                />
+                <div className="slider-value">
+                  Layover duration: Up to <span id="duration_value">{filters.layoverDuration}</span>hr
+                </div>
+              </div>
+            </div>
+
+            <div className="sidebar-section">
+              <h3>Layover conditions</h3>
+              <div className="toggle-switch">
+                <input 
+                  type="checkbox" 
+                  id="convenient_layovers"
+                  checked={filters.convenientLayovers}
+                  onChange={(e) => handleFilterChange('convenientLayovers', e.target.checked)}
+                />
+                <label htmlFor="convenient_layovers">Convenient layovers</label>
+              </div>
+              <div className="toggle-switch">
+                <input 
+                  type="checkbox" 
+                  id="no_overnight_layovers"
+                  checked={filters.noOvernightLayovers}
+                  onChange={(e) => handleFilterChange('noOvernightLayovers', e.target.checked)}
+                />
+                <label htmlFor="no_overnight_layovers">No overnight layovers</label>
+              </div>
+            </div>
+          </aside>
+
+          <div className="results-area">
+            {flights.length > 0 && (
+              <div className="fare-summary">
+                <h3>Cheapest fare with baggage</h3>
+                <div className="fare-features">
+                  <span>Hand luggage 1x5 kg</span>
+                  <span>Baggage 1x23 kg</span>
+                  <span>No exchange</span>
+                  <span>No refund</span>
+                </div>
+                <div className="fare-more">
+                  <span>If other conditions are needed, suitable fares will be found</span>
+                  <span>→</span>
+                </div>
+              </div>
+            )}
+
+            {flights.length > 0 && (
+              <div className="flight-section">
+                <h3 className="section-title">
+                  {departureCity} — {arrivalCity}
+                </h3>
+                {flights.map((flight) => {
+                  const badge = getBadge(flight, flights)
+                  const totalDuration = calculateTotalDuration(flight.departure_time, flight.arrival_time)
+                  const flightTime = calculateFlightTime(flight.departure_time, flight.arrival_time)
+                  
+                  return (
+                    <div 
+                      key={flight.flight_id} 
+                      className={`flight-result-card ${selectedFlight?.flight_id === flight.flight_id ? 'selected' : ''}`}
+                      onClick={() => setSelectedFlight(flight)}
+                    >
+                      <div className="flight-route-header">
+                        <div className="route-info">
+                          <span className="route-cities">{departureCity} — {arrivalCity}</span>
+                          <span className="route-duration">{totalDuration} в дорозі</span>
+                        </div>
+                      </div>
+
+                      <div className="flight-segment-detailed">
+                        <div className="segment-header">
+                          <div className="airline-info">
+                            <div className="airline-logo-small">{flight.airline_code || 'FL'}</div>
+                            <div>
+                              <div className="airline-name">{flight.airline_name || 'Airline'}</div>
+                              <div className="flight-time-info">{flightTime} в польоті</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="segment-details">
+                          <div className="segment-departure">
+                            <div className="segment-time">{formatTime(flight.departure_time)}</div>
+                            <div className="segment-location">
+                              <div className="location-city">{flight.departure_city}</div>
+                              <div className="location-date">{formatDateShort(flight.departure_time)}</div>
+                              <div className="location-airport">{flight.departure_airport_name}, {flight.departure_airport_code}</div>
+                            </div>
+                          </div>
+
+                          <div className="segment-arrival">
+                            <div className="segment-time">{formatTime(flight.arrival_time)}</div>
+                            <div className="segment-location">
+                              <div className="location-city">{flight.arrival_city}</div>
+                              <div className="location-date">{formatDateShort(flight.arrival_time)}</div>
+                              <div className="location-airport">{flight.arrival_airport_name}, {flight.arrival_airport_code}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <button className="details-btn">Детальніше</button>
+                      </div>
+
+                      <div className="flight-action">
+                        <button 
+                          className="price-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedFlight(flight)
+                          }}
+                        >
+                          від {parseFloat(flight.min_price).toFixed(0)} ₴
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {returnFlights.length > 0 && (
+              <div className="flight-section">
+                <h3 className="section-title">
+                  {arrivalCity} — {departureCity}
+                </h3>
+                {returnFlights.map((flight) => {
+                  const totalDuration = calculateTotalDuration(flight.departure_time, flight.arrival_time)
+                  const flightTime = calculateFlightTime(flight.departure_time, flight.arrival_time)
+                  
+                  return (
+                    <div 
+                      key={`return-${flight.flight_id}`} 
+                      className={`flight-result-card ${selectedFlight?.flight_id === flight.flight_id ? 'selected' : ''}`}
+                      onClick={() => setSelectedFlight(flight)}
+                    >
+                      <div className="flight-route-header">
+                        <div className="route-info">
+                          <span className="route-cities">{arrivalCity} — {departureCity}</span>
+                          <span className="route-duration">{totalDuration} в дорозі</span>
+                        </div>
+                      </div>
+
+                      <div className="flight-segment-detailed">
+                        <div className="segment-header">
+                          <div className="airline-info">
+                            <div className="airline-logo-small">{flight.airline_code || 'FL'}</div>
+                            <div>
+                              <div className="airline-name">{flight.airline_name || 'Airline'}</div>
+                              <div className="flight-time-info">{flightTime} в польоті</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="segment-details">
+                          <div className="segment-departure">
+                            <div className="segment-time">{formatTime(flight.departure_time)}</div>
+                            <div className="segment-location">
+                              <div className="location-city">{flight.departure_city}</div>
+                              <div className="location-date">{formatDateShort(flight.departure_time)}</div>
+                              <div className="location-airport">{flight.departure_airport_name}, {flight.departure_airport_code}</div>
+                            </div>
+                          </div>
+
+                          <div className="segment-arrival">
+                            <div className="segment-time">{formatTime(flight.arrival_time)}</div>
+                            <div className="segment-location">
+                              <div className="location-city">{flight.arrival_city}</div>
+                              <div className="location-date">{formatDateShort(flight.arrival_time)}</div>
+                              <div className="location-airport">{flight.arrival_airport_name}, {flight.arrival_airport_code}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <button className="details-btn">Детальніше</button>
+                      </div>
+
+                      <div className="flight-action">
+                        <button 
+                          className="price-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedFlight(flight)
+                          }}
+                        >
+                          від {parseFloat(flight.min_price).toFixed(0)} ₴
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {allFlights.length === 0 && (
+              <div className="flight-result-card">
+                <p>No flights found. Try adjusting your search criteria.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {displayFlight && (
+          <aside className="booking-sidebar">
+            <div className="booking-card">
+              <div className="booking-price">
+                <div className="price-amount-large">{parseFloat(displayFlight.min_price).toFixed(0)} ₴</div>
+                <div className="price-provider">Airport Project</div>
+              </div>
+              
+              <button 
+                className="buy-btn"
+                onClick={() => buyFlight(displayFlight)}
+              >
+                Купити
+              </button>
+
+              <div className="trust-message">
+                <span className="trust-icon">✓</span>
+                <span>Усім продавцям можна довіряти, але якщо будуть питання — ми поруч</span>
+              </div>
+
+              <div className="booking-note">
+                <p>Follow instructions on the seller's website</p>
+                <p className="poetic">Time flies, but flights take time</p>
+              </div>
+            </div>
+          </aside>
+        )}
+      </div>
+    </div>
   )
 }
 
 export default FlightResultsPage
-

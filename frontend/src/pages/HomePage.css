@@ -1,0 +1,352 @@
+/* Modern Dark-Orange Theme */
+.home-page-modern {
+  min-height: 100vh;
+  background: #0a0a0a;
+  color: #ffffff;
+}
+
+/* Hero Section - Modern Dark */
+.hero-modern {
+  background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
+  color: white;
+  padding: 120px 20px 80px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-modern::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(255, 87, 34, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255, 152, 0, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.hero-content-modern {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-icon-wrapper {
+  margin-bottom: 32px;
+  display: inline-block;
+}
+
+.hero-icon-modern {
+  font-size: 100px !important;
+  color: #ff5722;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+.hero-title-modern {
+  font-size: 4rem !important;
+  font-weight: 800 !important;
+  margin-bottom: 24px !important;
+  line-height: 1.1 !important;
+  background: linear-gradient(135deg, #ffffff 0%, #ff9800 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-subtitle-modern {
+  font-size: 1.4rem !important;
+  margin-bottom: 48px !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+  font-weight: 300 !important;
+}
+
+.hero-buttons-modern {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-bottom: 40px;
+  flex-wrap: wrap;
+}
+
+.hero-button-modern {
+  padding: 16px 40px !important;
+  font-size: 1.1rem !important;
+  font-weight: 600 !important;
+  border-radius: 50px !important;
+  text-transform: none !important;
+  transition: all 0.3s ease !important;
+  border: none !important;
+}
+
+.hero-button-modern.primary {
+  background: linear-gradient(135deg, #ff5722 0%, #ff9800 100%) !important;
+  color: white !important;
+}
+
+.hero-button-modern.primary:hover {
+  background: linear-gradient(135deg, #ff7043 0%, #ffb74d 100%) !important;
+  transform: translateY(-3px);
+}
+
+.hero-button-modern.secondary {
+  background: transparent !important;
+  color: #ff9800 !important;
+  border: 2px solid #ff9800 !important;
+}
+
+.hero-button-modern.secondary:hover {
+  background: rgba(255, 152, 0, 0.1) !important;
+  border-color: #ffb74d !important;
+  transform: translateY(-3px);
+}
+
+.hero-badges-modern {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.badge-chip-modern {
+  background: rgba(255, 152, 0, 0.15) !important;
+  color: #ff9800 !important;
+  border: 1px solid rgba(255, 152, 0, 0.3) !important;
+  font-weight: 500 !important;
+  backdrop-filter: blur(10px);
+}
+
+.badge-chip-modern:hover {
+  background: rgba(255, 152, 0, 0.25) !important;
+  border-color: rgba(255, 152, 0, 0.5) !important;
+}
+
+/* Stats Section - Modern */
+.stats-section-modern {
+  margin-top: -60px;
+  position: relative;
+  z-index: 2;
+  padding: 60px 40px;
+  background: #141414;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 152, 0, 0.1);
+}
+
+.stat-item-modern {
+  text-align: center;
+  padding: 20px;
+}
+
+.stat-number-modern {
+  font-size: 3.5rem !important;
+  font-weight: 800 !important;
+  background: linear-gradient(135deg, #ff5722 0%, #ff9800 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 12px !important;
+  line-height: 1 !important;
+}
+
+.stat-label-modern {
+  font-size: 1rem !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  font-weight: 400 !important;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Section Header */
+.features-container-modern {
+  margin-top: 100px;
+  margin-bottom: 100px;
+}
+
+.section-header-modern {
+  text-align: center;
+  margin-bottom: 60px;
+}
+
+.section-title-modern {
+  font-size: 3rem !important;
+  font-weight: 800 !important;
+  margin-bottom: 20px !important;
+  color: #ffffff;
+  background: linear-gradient(135deg, #ffffff 0%, #ff9800 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.section-subtitle-modern {
+  font-size: 1.2rem !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  font-weight: 300 !important;
+}
+
+/* Feature Cards - Modern */
+.features-grid-modern {
+  margin-top: 40px;
+}
+
+.feature-card-modern {
+  height: 100%;
+  transition: all 0.3s ease !important;
+  border-radius: 16px !important;
+  background: #141414 !important;
+  border: 1px solid rgba(255, 152, 0, 0.1) !important;
+  backdrop-filter: blur(10px);
+}
+
+.feature-card-modern:hover {
+  transform: translateY(-8px);
+  border-color: rgba(255, 152, 0, 0.3) !important;
+  background: #1a1a1a !important;
+}
+
+.feature-content-modern {
+  text-align: center;
+  padding: 40px 32px !important;
+}
+
+.feature-icon-modern {
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: center;
+  color: #ff9800;
+  font-size: 48px !important;
+}
+
+.feature-title-modern {
+  font-size: 1.5rem !important;
+  font-weight: 700 !important;
+  margin-bottom: 16px !important;
+  color: #ffffff;
+}
+
+.feature-description-modern {
+  color: rgba(255, 255, 255, 0.6) !important;
+  line-height: 1.7 !important;
+  font-weight: 300 !important;
+}
+
+/* CTA Section - Modern */
+.cta-section-modern {
+  background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+  color: white;
+  padding: 100px 20px;
+  text-align: center;
+  margin-top: 80px;
+  position: relative;
+  overflow: hidden;
+}
+
+.cta-section-modern::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 50% 50%, rgba(255, 87, 34, 0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.cta-content-modern {
+  max-width: 700px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+.cta-title-modern {
+  font-size: 3rem !important;
+  font-weight: 800 !important;
+  margin-bottom: 24px !important;
+  color: white !important;
+  background: linear-gradient(135deg, #ffffff 0%, #ff9800 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.cta-subtitle-modern {
+  font-size: 1.3rem !important;
+  margin-bottom: 40px !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-weight: 300 !important;
+}
+
+.cta-button-modern {
+  background: linear-gradient(135deg, #ff5722 0%, #ff9800 100%) !important;
+  color: white !important;
+  padding: 18px 48px !important;
+  font-size: 1.2rem !important;
+  font-weight: 600 !important;
+  border-radius: 50px !important;
+  text-transform: none !important;
+  transition: all 0.3s ease !important;
+  border: none !important;
+}
+
+.cta-button-modern:hover {
+  background: linear-gradient(135deg, #ff7043 0%, #ffb74d 100%) !important;
+  transform: translateY(-3px);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .hero-title-modern {
+    font-size: 2.5rem !important;
+  }
+  
+  .hero-subtitle-modern {
+    font-size: 1.1rem !important;
+  }
+  
+  .hero-buttons-modern {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .hero-button-modern {
+    width: 100%;
+    max-width: 300px;
+  }
+  
+  .section-title-modern {
+    font-size: 2rem !important;
+  }
+  
+  .cta-title-modern {
+    font-size: 2rem !important;
+  }
+  
+  .stat-number-modern {
+    font-size: 2.5rem !important;
+  }
+  
+  .stats-section-modern {
+    padding: 40px 20px;
+  }
+  
+  .feature-content-modern {
+    padding: 32px 24px !important;
+  }
+}
