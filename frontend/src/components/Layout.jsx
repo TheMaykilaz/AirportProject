@@ -111,9 +111,9 @@ const Layout = ({ children }) => {
           )}
         </Toolbar>
       </AppBar>
-      <Container maxWidth="xl" sx={{ flex: 1, py: 4 }}>
+      <Box sx={{ flex: 1, width: '100%', py: 4 }}>
         {children}
-      </Container>
+      </Box>
       <Box
         component="footer"
         className="footer"
