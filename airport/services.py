@@ -14,6 +14,63 @@ from bookings.services import PricingService, SeatReservationService
 class FlightSearchService:
     """Service for searching and comparing flights across multiple airlines"""
     
+    # Basic UA->EN mapping for popular city exonyms and transliteration fallback
+    UA_EN_CITY_MAP = {
+        'київ': ['Kyiv', 'Kiev'],
+        'львів': ['Lviv'],
+        'харків': ['Kharkiv', 'Kharkov'],
+        'дніпро': ['Dnipro', 'Dnipropetrovsk'],
+        'одеса': ['Odesa', 'Odessa'],
+        'ніколь': ['Mykolaiv', 'Nikolaev'],
+        'запоріжжя': ['Zaporizhzhia', 'Zaporozhye'],
+        'івано-франківськ': ['Ivano-Frankivsk'],
+        'чернівці': ['Chernivtsi'],
+        'ужгород': ['Uzhhorod', 'Uzhgorod'],
+        'луцьк': ['Lutsk'],
+        'тернопіль': ['Ternopil'],
+        'ризь': ['Riga'],
+        'варшава': ['Warsaw'],
+        'краків': ['Krakow', 'Cracow'],
+        'берлін': ['Berlin'],
+        'париж': ['Paris'],
+        'лондон': ['London'],
+        'нью йорк': ['New York'],
+        'нью-йорк': ['New York'],
+        'лос-анджелес': ['Los Angeles'],
+        'франкфурт': ['Frankfurt'],
+        'рома': ['Rome', 'Roma'],
+        'мілан': ['Milan'],
+    }
+
+    @classmethod
+    def _maybe_transliterate_ua_to_en(cls, text: str) -> str:
+        """Very rough UA->EN transliteration for search fallback."""
+        mapping = {
+            'а':'a','б':'b','в':'v','г':'h','ґ':'g','д':'d','е':'e','є':'ie','ж':'zh','з':'z',
+            'и':'y','і':'i','ї':'i','й':'i','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p',
+            'р':'r','с':'s','т':'t','у':'u','ф':'f','х':'kh','ц':'ts','ч':'ch','ш':'sh','щ':'shch',
+            'ь':'','ю':'iu','я':'ia','ʼ':'','’':'','-':' ','’':'',
+        }
+        res = ''.join(mapping.get(ch, ch) for ch in text.lower())
+        return res
+
+    @classmethod
+    def _expand_city_query(cls, city: str) -> list:
+        """Create list of possible English spellings for a given (possibly UA) city string."""
+        if not city:
+            return []
+        city_lc = city.strip().lower()
+        variants = {city}
+        # Known mapping
+        if city_lc in cls.UA_EN_CITY_MAP:
+            for v in cls.UA_EN_CITY_MAP[city_lc]:
+                variants.add(v)
+        # Transliteration fallback
+        if any('\u0400' <= ch <= '\u04FF' for ch in city_lc):
+            translit = cls._maybe_transliterate_ua_to_en(city_lc)
+            variants.add(translit)
+        return list(variants)
+
     @classmethod
     def search_flights(
         cls,
@@ -57,16 +114,24 @@ class FlightSearchService:
             'airline', 'airplane', 'departure_airport', 'arrival_airport'
         ).prefetch_related('seats')
         
-        # Filter by airports or cities
+        # Filter by airports or cities (with UA support)
         if departure_airport_code:
             queryset = queryset.filter(departure_airport__code__iexact=departure_airport_code)
         elif departure_city:
-            queryset = queryset.filter(departure_airport__city__icontains=departure_city)
+            dep_variants = cls._expand_city_query(departure_city)
+            q_obj = Q()
+            for v in dep_variants:
+                q_obj |= Q(departure_airport__city__icontains=v)
+            queryset = queryset.filter(q_obj)
         
         if arrival_airport_code:
             queryset = queryset.filter(arrival_airport__code__iexact=arrival_airport_code)
         elif arrival_city:
-            queryset = queryset.filter(arrival_airport__city__icontains=arrival_city)
+            arr_variants = cls._expand_city_query(arrival_city)
+            q_obj = Q()
+            for v in arr_variants:
+                q_obj |= Q(arrival_airport__city__icontains=v)
+            queryset = queryset.filter(q_obj)
         
         # Filter by date
         if departure_date:

@@ -1,7 +1,12 @@
 .footer {
-  background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+  /* Dark base with subtle orange radial lights to match site theme */
+  background: radial-gradient(900px 400px at 15% 20%, rgba(255,140,0,0.12) 0%, rgba(0,0,0,0) 60%),
+              radial-gradient(700px 300px at 85% 80%, rgba(255,87,34,0.10) 0%, rgba(0,0,0,0) 60%),
+              #0b0b0b;
   color: white;
   margin-top: auto;
+  border-top: 1px solid rgba(255,153,0,0.25);
+  box-shadow: 0 -4px 18px rgba(255,153,0,0.08);
 }
 
 .footer-section {
@@ -31,14 +36,15 @@
 }
 
 .social-icon {
-  color: rgba(255, 255, 255, 0.8) !important;
+  color: rgba(255, 152, 0, 0.85) !important;
   transition: all 0.3s ease !important;
 }
 
 .social-icon:hover {
-  color: white !important;
-  background: rgba(255, 255, 255, 0.1) !important;
+  color: #ffb74d !important;
+  background: rgba(255, 152, 0, 0.12) !important;
   transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(255, 152, 0, 0.18) !important;
 }
 
 .footer-heading {
@@ -62,7 +68,7 @@
 }
 
 .footer-link:hover {
-  color: white !important;
+  color: #ffb74d !important;
   padding-left: 4px;
 }
 
@@ -79,7 +85,7 @@
 }
 
 .contact-icon {
-  color: rgba(255, 255, 255, 0.8) !important;
+  color: rgba(255, 152, 0, 0.85) !important;
   font-size: 20px !important;
   margin-top: 2px;
   flex-shrink: 0;
@@ -104,7 +110,7 @@
 }
 
 .footer-credits {
-  color: rgba(255, 255, 255, 0.7) !important;
+  color: rgba(255, 255, 255, 0.75) !important;
   font-style: italic;
 }
 

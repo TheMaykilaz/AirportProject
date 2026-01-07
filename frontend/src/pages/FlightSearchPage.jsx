@@ -78,7 +78,7 @@ const FlightSearchPage = () => {
 
   return (
     <div className="flight-search-container">
-      <h1 className="search-title">Search cheap flight tickets</h1>
+      <h1 className="search-title">Пошук дешевих авіаквитків</h1>
       
       <div className="tabs">
         <button 
@@ -86,7 +86,7 @@ const FlightSearchPage = () => {
           onClick={() => setActiveTab('flights')}
         >
           <span className="tab-icon">✈️</span>
-          <span>Flights</span>
+          <span>Рейси</span>
         </button>
         <button 
           className={`tab ${activeTab === 'hotels' ? 'active' : ''}`}
@@ -96,28 +96,28 @@ const FlightSearchPage = () => {
           }}
         >
           <span className="tab-icon">🏨</span>
-          <span>Hotels</span>
+          <span>Готелі</span>
         </button>
         <button 
           className={`tab ${activeTab === 'favorites' ? 'active' : ''}`}
           onClick={() => {
             setActiveTab('favorites')
-            alert('Favorites feature coming soon!')
+            navigate('/favorites')
           }}
         >
           <span className="tab-icon">❤️</span>
-          <span>Favorites</span>
+          <span>Обране</span>
         </button>
       </div>
 
       <div className="search-form-container">
         <form id="flightSearchForm" className="search-form" onSubmit={handleSubmit}>
           <div className="form-field departure">
-            <label>From</label>
+            <label>Звідки</label>
             <input 
               type="text" 
               name="departure_city" 
-              placeholder="City or airport" 
+              placeholder="Місто або аеропорт" 
               value={formData.departure_city}
               onChange={handleChange}
               autoComplete="off"
@@ -135,11 +135,11 @@ const FlightSearchPage = () => {
           </button>
           
           <div className="form-field arrival">
-            <label>To</label>
+            <label>Куди</label>
             <input 
               type="text" 
               name="arrival_city" 
-              placeholder="City or airport" 
+              placeholder="Місто або аеропорт" 
               value={formData.arrival_city}
               onChange={handleChange}
               autoComplete="off"
@@ -148,7 +148,7 @@ const FlightSearchPage = () => {
           </div>
           
           <div className="form-field dates">
-            <label>Departure</label>
+            <label>Виліт</label>
             <div style={{ position: 'relative' }}>
               <input 
                 type="date" 
@@ -172,7 +172,7 @@ const FlightSearchPage = () => {
           </div>
           
           <div className="form-field dates">
-            <label>Return</label>
+            <label>Повернення</label>
             <div style={{ position: 'relative' }}>
               <input 
                 type="date" 
@@ -195,12 +195,12 @@ const FlightSearchPage = () => {
           </div>
           
           <div className="form-field passengers">
-            <label>Passengers</label>
+            <label>Пасажири</label>
             <div className="passenger-dropdown" onClick={togglePassengerMenu}>
               <div className="passenger-display">
                 <div className="passenger-info">
                   <span className="passenger-count">
-                    {formData.passengers} {formData.passengers === 1 ? 'passenger' : 'passengers'}
+                    {formData.passengers} {formData.passengers === 1 ? 'пасажир' : 'пасажири'}
                   </span>
                   <span className="passenger-class">
                     {formData.class.charAt(0).toUpperCase() + formData.class.slice(1)}

@@ -121,5 +121,25 @@ export const airportAPI = {
     api.get('/airport/airlines/'),
 }
 
+export const aiChatAPI = {
+  send: (message, conversation_history = []) =>
+    api.post('/ai-chat/api/chat/', { message, conversation_history }),
+}
+
+// Hotels API
+export const hotelsAPI = {
+  // Simple list/search with query params
+  list: (params) => api.get('/hotels/hotels/', { params }),
+  // Advanced search with availability check (POST)
+  search: (data) => api.post('/hotels/hotels/search/', data),
+  // Get rooms for a particular hotel
+  rooms: (hotelId, params) => api.get(`/hotels/hotels/${hotelId}/rooms/`, { params }),
+}
+
+// User API
+export const userAPI = {
+  update: (userId, data) => api.patch(`/users/users/${userId}/`, data),
+}
+
 export default api
 

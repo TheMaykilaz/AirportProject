@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { format, parseISO, differenceInHours, differenceInMinutes } from 'date-fns'
+import { useLanguage } from '../contexts/LanguageContext'
 import { flightAPI } from '../services/api'
 import './FlightResultsPage.css'
 
@@ -13,6 +14,8 @@ const FlightResultsPage = () => {
   const [error, setError] = useState(null)
   const [priceStats, setPriceStats] = useState(null)
   const [selectedFlight, setSelectedFlight] = useState(null)
+  const [airlines, setAirlines] = useState([])
+  const { formatPrice } = useLanguage()
   const [filters, setFilters] = useState({
     baggageIncluded: false,
     layoverDuration: 24,
@@ -21,7 +24,42 @@ const FlightResultsPage = () => {
     sortBy: 'price', // 'price' or 'duration'
     directFlightsOnly: false,
     noVisaRequired: false,
+    minPrice: '',
+    maxPrice: '',
+    airline: 'any',
+    depTimeStart: '00:00',
+    depTimeEnd: '23:59',
+    maxDurationHours: 24,
   })
+
+  // Favorites (localStorage)
+  const FAVORITES_KEY = 'favorite_flights'
+  const readFavorites = () => {
+    try { return JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]') } catch { return [] }
+  }
+  const writeFavorites = (items) => {
+    try { localStorage.setItem(FAVORITES_KEY, JSON.stringify(items)) } catch {}
+  }
+  const isFavorite = (flightId) => readFavorites().some(f => f.flight_id === flightId)
+  const toggleFavorite = (flightObj) => {
+    const items = readFavorites()
+    const exists = items.find(f => f.flight_id === flightObj.flight_id)
+    let next
+    if (exists) {
+      next = items.filter(f => f.flight_id !== flightObj.flight_id)
+    } else {
+      // store minimal data for favorites page
+      const pick = ({
+        flight_id, airline_name, airline_code, departure_time, arrival_time,
+        departure_city, arrival_city, departure_airport_name, arrival_airport_name,
+        departure_airport_code, arrival_airport_code, min_price
+      }) => ({ flight_id, airline_name, airline_code, departure_time, arrival_time,
+        departure_city, arrival_city, departure_airport_name, arrival_airport_name,
+        departure_airport_code, arrival_airport_code, min_price })
+      next = [pick(flightObj), ...items]
+    }
+    writeFavorites(next)
+  }
 
   useEffect(() => {
     searchFlights()
@@ -32,22 +70,27 @@ const FlightResultsPage = () => {
     setError(null)
     try {
       const params = Object.fromEntries(searchParams.entries())
-      // Convert city names to airport codes if needed
-      if (params.departure_city && !params.departure_airport_code) {
+      // Only convert to IATA code for Latin inputs; for Ukrainian leave city params for backend UA matching
+      const isLatin = (s) => /^[A-Za-z .'-]+$/.test(s || '')
+      if (params.departure_city && !params.departure_airport_code && isLatin(params.departure_city)) {
         params.departure_airport_code = getAirportCode(params.departure_city)
       }
-      if (params.arrival_city && !params.arrival_airport_code) {
+      if (params.arrival_city && !params.arrival_airport_code && isLatin(params.arrival_city)) {
         params.arrival_airport_code = getAirportCode(params.arrival_city)
       }
       
       const response = await flightAPI.search(params)
-      setFlights(response.data.results || [])
+      const res = response.data.results || []
+      setFlights(res)
       setReturnFlights(response.data.return_results || [])
       setPriceStats(response.data.price_stats)
       // Auto-select first flight for booking sidebar
-      if (response.data.results && response.data.results.length > 0) {
-        setSelectedFlight(response.data.results[0])
+      if (res && res.length > 0) {
+        setSelectedFlight(res[0])
       }
+      // derive airlines for filter
+      const names = Array.from(new Set(res.map(f => f.airline_name).filter(Boolean)))
+      setAirlines(names)
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to search flights')
     } finally {
@@ -215,6 +258,38 @@ const FlightResultsPage = () => {
     }
 
     // Sort
+    // Price range
+    if (filters.minPrice) {
+      filtered = filtered.filter(f => parseFloat(f.min_price) >= parseFloat(filters.minPrice))
+    }
+    if (filters.maxPrice) {
+      filtered = filtered.filter(f => parseFloat(f.min_price) <= parseFloat(filters.maxPrice))
+    }
+
+    // Airline
+    if (filters.airline !== 'any') {
+      filtered = filtered.filter(f => f.airline_name === filters.airline)
+    }
+
+    // Departure time window
+    const inTimeRange = (iso, start, end) => {
+      try {
+        const t = parseISO(iso)
+        const hh = String(t.getHours()).padStart(2, '0')
+        const mm = String(t.getMinutes()).padStart(2, '0')
+        const val = `${hh}:${mm}`
+        return (start <= val && val <= end)
+      } catch { return true }
+    }
+    filtered = filtered.filter(f => inTimeRange(f.departure_time, filters.depTimeStart, filters.depTimeEnd))
+
+    // Max duration
+    filtered = filtered.filter(f => {
+      const minutes = calculateTotalDurationMinutes(f.departure_time, f.arrival_time)
+      return minutes <= filters.maxDurationHours * 60
+    })
+
+    // Sort
     if (filters.sortBy === 'price') {
       filtered.sort((a, b) => parseFloat(a.min_price) - parseFloat(b.min_price))
     } else if (filters.sortBy === 'duration') {
@@ -272,10 +347,10 @@ const FlightResultsPage = () => {
         </div>
         <div>
           <button className="search-again-btn" onClick={() => navigate('/search')}>
-            Search flights
+            Пошук рейсів
           </button>
           <a href="#" className="multi-city-link" onClick={(e) => e.preventDefault()}>
-            Create multi-city route
+            Створити маршрут з кількома містами
           </a>
         </div>
       </div>
@@ -338,7 +413,7 @@ const FlightResultsPage = () => {
             </div>
 
             <div className="sidebar-section">
-              <h3>Baggage</h3>
+              <h3>Багаж</h3>
               <div className="filter-option">
                 <input 
                   type="checkbox" 
@@ -347,14 +422,14 @@ const FlightResultsPage = () => {
                   onChange={(e) => handleFilterChange('baggageIncluded', e.target.checked)}
                 />
                 <label htmlFor="baggage_included">
-                  <span>Baggage included</span>
-                  {priceStats && <span className="filter-price">${parseFloat(priceStats.max).toFixed(0)}</span>}
+                  <span>З багажем</span>
+                  {priceStats && <span className="filter-price">{formatPrice(priceStats.max, 'USD')}</span>}
                 </label>
               </div>
             </div>
 
             <div className="sidebar-section">
-              <h3>Layovers</h3>
+              <h3>Пересадки</h3>
               <div className="slider-container">
                 <input 
                   type="range" 
@@ -365,13 +440,13 @@ const FlightResultsPage = () => {
                   onChange={(e) => handleFilterChange('layoverDuration', parseInt(e.target.value))}
                 />
                 <div className="slider-value">
-                  Layover duration: Up to <span id="duration_value">{filters.layoverDuration}</span>hr
+                  Тривалість пересадки: до <span id="duration_value">{filters.layoverDuration}</span> год
                 </div>
               </div>
             </div>
 
             <div className="sidebar-section">
-              <h3>Layover conditions</h3>
+              <h3>Умови пересадок</h3>
               <div className="toggle-switch">
                 <input 
                   type="checkbox" 
@@ -379,7 +454,7 @@ const FlightResultsPage = () => {
                   checked={filters.convenientLayovers}
                   onChange={(e) => handleFilterChange('convenientLayovers', e.target.checked)}
                 />
-                <label htmlFor="convenient_layovers">Convenient layovers</label>
+                <label htmlFor="convenient_layovers">Зручні пересадки</label>
               </div>
               <div className="toggle-switch">
                 <input 
@@ -388,8 +463,72 @@ const FlightResultsPage = () => {
                   checked={filters.noOvernightLayovers}
                   onChange={(e) => handleFilterChange('noOvernightLayovers', e.target.checked)}
                 />
-                <label htmlFor="no_overnight_layovers">No overnight layovers</label>
+                <label htmlFor="no_overnight_layovers">Без нічних пересадок</label>
               </div>
+            </div>
+
+            {/* Додаткові фільтри */}
+            <div className="sidebar-section">
+              <h3>Ціна</h3>
+              <div className="price-range">
+                <input
+                  type="number"
+                  placeholder="Мін"
+                  value={filters.minPrice}
+                  onChange={(e) => handleFilterChange('minPrice', e.target.value)}
+                />
+                <span style={{ margin: '0 8px' }}>—</span>
+                <input
+                  type="number"
+                  placeholder="Макс"
+                  value={filters.maxPrice}
+                  onChange={(e) => handleFilterChange('maxPrice', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="sidebar-section">
+              <h3>Авіакомпанія</h3>
+              <select
+                value={filters.airline}
+                onChange={(e) => handleFilterChange('airline', e.target.value)}
+                style={{ width: '100%' }}
+              >
+                <option value="any">Будь-яка</option>
+                {airlines.map((a) => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="sidebar-section">
+              <h3>Час вильоту</h3>
+              <div className="time-range">
+                <input
+                  type="time"
+                  value={filters.depTimeStart}
+                  onChange={(e) => handleFilterChange('depTimeStart', e.target.value)}
+                />
+                <span style={{ margin: '0 8px' }}>—</span>
+                <input
+                  type="time"
+                  value={filters.depTimeEnd}
+                  onChange={(e) => handleFilterChange('depTimeEnd', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="sidebar-section">
+              <h3>Макс. тривалість</h3>
+              <input
+                type="number"
+                min="1"
+                max="48"
+                value={filters.maxDurationHours}
+                onChange={(e) => handleFilterChange('maxDurationHours', parseInt(e.target.value) || 24)}
+                style={{ width: '100%' }}
+              />
+              <div className="hint">годин</div>
             </div>
           </aside>
 
@@ -431,6 +570,13 @@ const FlightResultsPage = () => {
                           <span className="route-cities">{departureCity} — {arrivalCity}</span>
                           <span className="route-duration">{totalDuration} в дорозі</span>
                         </div>
+                        <button
+                          className={`like-btn ${isFavorite(flight.flight_id) ? 'liked' : ''}`}
+                          title={isFavorite(flight.flight_id) ? 'Прибрати з обраного' : 'Додати в обране'}
+                          onClick={(e) => { e.stopPropagation(); toggleFavorite(flight); }}
+                        >
+                          {isFavorite(flight.flight_id) ? '♥' : '♡'}
+                        </button>
                       </div>
 
                       <div className="flight-segment-detailed">

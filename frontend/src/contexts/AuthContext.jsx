@@ -67,8 +67,17 @@ export const AuthProvider = ({ children }) => {
     setUser(null)
   }
 
+  const refreshUser = async () => {
+    try {
+      const userResponse = await authAPI.getCurrentUser()
+      setUser(userResponse.data)
+    } catch (e) {
+      // ignore
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   )
