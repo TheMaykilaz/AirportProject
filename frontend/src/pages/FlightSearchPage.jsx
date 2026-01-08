@@ -14,6 +14,7 @@ const FlightSearchPage = () => {
     passengers: 1,
     class: 'economy',
   })
+  const [errors, setErrors] = useState({ departure_city: '', arrival_city: '' })
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -25,6 +26,15 @@ const FlightSearchPage = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    // basic inline validation
+    const nextErrors = { departure_city: '', arrival_city: '' }
+    if (!formData.departure_city.trim()) nextErrors.departure_city = 'Вкажіть місто відправлення'
+    if (!formData.arrival_city.trim()) nextErrors.arrival_city = 'Вкажіть місто прибуття'
+    if (!nextErrors.departure_city && !nextErrors.arrival_city && formData.departure_city.trim().toLowerCase() === formData.arrival_city.trim().toLowerCase()) {
+      nextErrors.arrival_city = 'Міста відправлення і прибуття не можуть співпадати'
+    }
+    setErrors(nextErrors)
+    if (nextErrors.departure_city || nextErrors.arrival_city) return
     const params = new URLSearchParams()
     
     Object.entries(formData).forEach(([key, value]) => {
@@ -123,6 +133,9 @@ const FlightSearchPage = () => {
               autoComplete="off"
             />
             <div className="airport-code" id="departure_code"></div>
+            {errors.departure_city && (
+              <div style={{ color: '#ff6b6b', fontSize: 12, marginTop: 4 }}>{errors.departure_city}</div>
+            )}
           </div>
           
           <button 
@@ -145,6 +158,9 @@ const FlightSearchPage = () => {
               autoComplete="off"
             />
             <div className="airport-code" id="arrival_code"></div>
+            {errors.arrival_city && (
+              <div style={{ color: '#ff6b6b', fontSize: 12, marginTop: 4 }}>{errors.arrival_city}</div>
+            )}
           </div>
           
           <div className="form-field dates">
@@ -215,24 +231,9 @@ const FlightSearchPage = () => {
         </form>
         
         <div className="search-button-container">
-          <a 
-            href="#" 
-            className="multi-city-link" 
-            onClick={(e) => {
-              e.preventDefault()
-              alert('Multi-city route feature coming soon!')
-            }}
-          >
-            🔗 Create multi-city route
-          </a>
           <button type="submit" form="flightSearchForm" className="search-button">
             Search flights
           </button>
-        </div>
-        
-        <div className="booking-checkbox">
-          <input type="checkbox" id="open_booking" name="open_booking" />
-          <label htmlFor="open_booking">Open Booking.com in new tab</label>
         </div>
       </div>
     </div>

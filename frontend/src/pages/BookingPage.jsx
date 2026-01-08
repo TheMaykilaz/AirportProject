@@ -33,6 +33,19 @@ const BookingPage = () => {
   const [baggageProtection, setBaggageProtection] = useState(false)
   const [timerSeconds, setTimerSeconds] = useState(20 * 60) // 20 minutes in seconds
 
+  // Visual-only Passport Autofill toggle (based on ProfilePage prefs in localStorage)
+  const PASSPORT_PREFS_KEY = 'passport_autofill_prefs'
+  const [passportAutofill, setPassportAutofill] = useState(false)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PASSPORT_PREFS_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        setPassportAutofill(!!parsed.enabled)
+      }
+    } catch {}
+  }, [])
+
   useEffect(() => {
     if (!user) {
       navigate('/login?redirect=/booking/' + flightId)
@@ -326,6 +339,24 @@ const BookingPage = () => {
           <div className="form-main-content">
             <div className="passenger-form-section">
               <h2 className="form-section-title">{t('passengerData', language)}</h2>
+              <div className="checkbox-group" style={{ marginBottom: '12px' }}>
+                <input
+                  type="checkbox"
+                  id="passport-autofill"
+                  checked={passportAutofill}
+                  onChange={(e) => {
+                    setPassportAutofill(e.target.checked)
+                    try {
+                      const raw = localStorage.getItem(PASSPORT_PREFS_KEY)
+                      const base = raw ? JSON.parse(raw) : {}
+                      localStorage.setItem(PASSPORT_PREFS_KEY, JSON.stringify({ ...base, enabled: e.target.checked }))
+                    } catch {}
+                  }}
+                />
+                <label htmlFor="passport-autofill">
+                  Автозаповнення даних паспорта
+                </label>
+              </div>
               
               {passengers.map((passenger, index) => (
                 <div key={index} className="passenger-form-block">

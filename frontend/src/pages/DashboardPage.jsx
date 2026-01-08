@@ -19,12 +19,14 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { bookingAPI } from '../services/api'
 import { format } from 'date-fns'
+import { useLanguage } from '../contexts/LanguageContext'
 
 const DashboardPage = () => {
   const { user } = useAuth()
   const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const { formatPrice } = useLanguage()
 
   useEffect(() => {
     loadBookings()
@@ -50,65 +52,70 @@ const DashboardPage = () => {
   }
 
   return (
-    <Box>
-      <Typography variant="h4" gutterBottom fontWeight="bold" sx={{ mb: 4 }}>
-        Dashboard
+    <Box sx={{
+      minHeight: 'calc(100vh - 160px)'
+    }}>
+      <Typography variant="h4" gutterBottom fontWeight="bold" sx={{ mb: 4, color: '#fff' }}>
+        Адмінська панель
       </Typography>
 
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} md={4}>
-          <Card>
+          <Card sx={{ bgcolor: '#121212', color: '#fff', border: '1px solid #2a2a2a' }}>
             <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Welcome, {user?.first_name || user?.email}!
+              <Typography variant="h6" gutterBottom sx={{ color: '#FFA500' }}>
+                Вітаємо, {user?.first_name || user?.email}!
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
                 {user?.email}
               </Typography>
             </CardContent>
           </Card>
         </Grid>
         <Grid item xs={12} md={4}>
-          <Card>
+          <Card sx={{ bgcolor: '#121212', color: '#fff', border: '1px solid #2a2a2a' }}>
             <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Total Bookings
+              <Typography variant="h6" gutterBottom sx={{ color: '#FFA500' }}>
+                Усього бронювань
               </Typography>
-              <Typography variant="h4" fontWeight="bold" color="primary">
+              <Typography variant="h4" fontWeight="bold" sx={{ color: '#FFA500' }}>
                 {bookings.length}
               </Typography>
             </CardContent>
           </Card>
         </Grid>
         <Grid item xs={12} md={4}>
-          <Card>
+          <Card sx={{ bgcolor: '#121212', color: '#fff', border: '1px solid #2a2a2a' }}>
             <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Account Status
+              <Typography variant="h6" gutterBottom sx={{ color: '#FFA500' }}>
+                Статус акаунта
               </Typography>
-              <Chip label="Active" color="success" />
+              <Chip label="Активний" color="success" />
             </CardContent>
           </Card>
         </Grid>
       </Grid>
 
-      <Typography variant="h5" gutterBottom fontWeight="bold" sx={{ mb: 2 }}>
-        My Bookings
+      <Typography variant="h5" gutterBottom fontWeight="bold" sx={{ mb: 2, color: '#fff' }}>
+        Мої бронювання
       </Typography>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       {bookings.length === 0 ? (
-        <Alert severity="info">You don't have any bookings yet.</Alert>
+        <Alert severity="info">У вас поки немає бронювань.</Alert>
       ) : (
-        <TableContainer component={Paper}>
-          <Table>
+        <TableContainer component={Paper} sx={{ bgcolor: '#121212', border: '1px solid #2a2a2a' }}>
+          <Table sx={{
+            '& th': { color: '#ffb74d' },
+            '& td': { color: '#fff' }
+          }}>
             <TableHead>
               <TableRow>
-                <TableCell>Order ID</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Total Amount</TableCell>
-                <TableCell>Created At</TableCell>
+                <TableCell>Замовлення</TableCell>
+                <TableCell>Статус</TableCell>
+                <TableCell>Сума</TableCell>
+                <TableCell>Створено</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -117,7 +124,10 @@ const DashboardPage = () => {
                   <TableCell>#{booking.id}</TableCell>
                   <TableCell>
                     <Chip
-                      label={booking.status || 'Pending'}
+                      label={
+                        booking.status === 'confirmed' ? 'підтверджено' :
+                        booking.status === 'cancelled' ? 'скасовано' : 'опрацьовується'
+                      }
                       color={
                         booking.status === 'confirmed'
                           ? 'success'
@@ -127,7 +137,7 @@ const DashboardPage = () => {
                       }
                     />
                   </TableCell>
-                  <TableCell>${parseFloat(booking.total_amount || 0).toFixed(2)}</TableCell>
+                  <TableCell>{formatPrice(booking.total_price ?? booking.total_amount ?? 0, 'USD')}</TableCell>
                   <TableCell>
                     {booking.created_at
                       ? format(new Date(booking.created_at), 'MMM dd, yyyy')

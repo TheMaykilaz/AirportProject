@@ -15,6 +15,7 @@ from rest_framework.permissions import AllowAny
 from drf_spectacular.utils import extend_schema, OpenApiExample
 
 from bookings.models import Order, OrderStatus
+from hotels.models import Hotel
 from .models import Payment, PaymentStatus, Coupon, CouponStatus
 from .serializers import PaymentSerializer, CouponSerializer
 from AirplaneDJ.permissions import IsAdmin, IsSelfOrAdmin, ReadOnly
@@ -543,6 +544,66 @@ class PaymentCancelView(View):
         return render(request, 'payment_cancel.html', {
             'order_id': order_id
         })
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def create_hotel_checkout_session(request):
+    """Create Stripe Checkout session for a hotel booking without creating an Order.
+    Body: { hotel_id: int, nights: int, board: 'bb'|'hb'|'ai' }
+    Pricing uses hotel's min_price_per_night with multipliers.
+    """
+    try:
+        hotel_id = int(request.data.get('hotel_id'))
+        nights = int(request.data.get('nights') or 1)
+        board = (request.data.get('board') or 'bb').lower()
+    except Exception:
+        return Response({"error": "Invalid payload"}, status=status.HTTP_400_BAD_REQUEST)
+
+    if nights < 1 or nights > 30:
+        return Response({"error": "nights must be between 1 and 30"}, status=status.HTTP_400_BAD_REQUEST)
+
+    hotel = get_object_or_404(Hotel, id=hotel_id, is_active=True)
+
+    # Determine base price per night
+    try:
+        if hotel.rooms.filter(is_available=True).exists():
+            base = hotel.rooms.filter(is_available=True).order_by('base_price_per_night').first().base_price_per_night
+        else:
+            base = Decimal(str(hotel.min_price_per_night or '100'))
+    except Exception:
+        base = Decimal('100')
+
+    multipliers = {'bb': Decimal('1.0'), 'hb': Decimal('1.3'), 'ai': Decimal('1.8')}
+    labels = {'bb': 'Bed & Breakfast', 'hb': 'Half Board', 'ai': 'All Inclusive'}
+    m = multipliers.get(board, Decimal('1.0'))
+    label = labels.get(board, 'Bed & Breakfast')
+
+    amount = (Decimal(base) * Decimal(nights) * m).quantize(Decimal('0.01'))
+
+    domain = request.build_absolute_uri('/')[:-1]
+    try:
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': f'Hotel {hotel.name} — {label}',
+                        'description': f'{nights} night(s) in {hotel.city}, {hotel.country}',
+                    },
+                    'unit_amount': int(amount * 100),
+                },
+                'quantity': 1,
+            }],
+            mode='payment',
+            success_url=domain + '/api/payments/success/?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url=domain + '/api/payments/cancel/',
+            metadata={'hotel_id': hotel.id, 'nights': str(nights), 'board': board}
+        )
+        return Response({'checkout_url': checkout_session.url, 'session_id': checkout_session.id, 'amount': str(amount)}, status=201)
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
 
 
 @api_view(["POST"])

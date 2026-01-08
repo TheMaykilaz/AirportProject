@@ -40,11 +40,11 @@ const Layout = ({ children }) => {
   const [anchorEl, setAnchorEl] = useState(null)
   
   // Pages that should be full-width (no container)
-  const fullWidthPages = ['/', '/search', '/results', '/booking', '/chat', '/hotels', '/favorites', '/my-flights', '/profile']
+  const fullWidthPages = ['/', '/search', '/results', '/booking', '/chat', '/hotels', '/favorites', '/my-flights', '/profile', '/dashboard']
   const isFullWidth = fullWidthPages.some(path => location.pathname === path || location.pathname.startsWith(path + '/'))
   
   // Routes that use dark orange theme background for the whole viewport
-  const darkThemeRoutes = ['/chat', '/hotels', '/favorites', '/my-flights', '/profile']
+  const darkThemeRoutes = ['/chat', '/hotels', '/favorites', '/my-flights', '/profile', '/dashboard']
   const isDarkTheme = darkThemeRoutes.some(path => location.pathname === path || location.pathname.startsWith(path + '/'))
 
   const handleMenuOpen = (event) => {

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Box, Typography, Paper, Grid, TextField, Button, MenuItem, CircularProgress, Card, CardContent, Chip, Stack } from '@mui/material'
+import { useNavigate } from 'react-router-dom'
 import { hotelsAPI } from '../services/api'
 import { useLanguage } from '../contexts/LanguageContext'
 
 function HotelsPage() {
+  const navigate = useNavigate()
   const { formatPrice } = useLanguage()
   const [filters, setFilters] = useState({
     city: '',
@@ -174,7 +176,7 @@ function HotelsPage() {
             ) : (
               results.map((h) => (
                 <Grid key={h.id} item xs={12} md={6} lg={4}>
-                  <Card sx={{ bgcolor: '#121212', color: '#fff', border: '1px solid #2a2a2a' }}>
+                  <Card onClick={() => navigate(`/hotels/${h.id}`)} sx={{ bgcolor: '#121212', color: '#fff', border: '1px solid #2a2a2a', cursor: 'pointer', '&:hover': { borderColor: '#FFA500' } }}>
                     <CardContent>
                       <Typography variant="h6" sx={{ color: '#FFA500', fontWeight: 700 }}>
                         {h.name}

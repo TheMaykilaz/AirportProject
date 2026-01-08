@@ -134,6 +134,13 @@ export const hotelsAPI = {
   search: (data) => api.post('/hotels/hotels/search/', data),
   // Get rooms for a particular hotel
   rooms: (hotelId, params) => api.get(`/hotels/hotels/${hotelId}/rooms/`, { params }),
+  // Get single hotel
+  get: (hotelId) => api.get(`/hotels/hotels/${hotelId}/`),
+}
+
+// Stripe Hotel payment
+export const stripeHotelAPI = {
+  checkout: (payload) => api.post('/payments/hotel-checkout/', payload),
 }
 
 // User API

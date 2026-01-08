@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Box, Paper, Typography, Grid, Button, IconButton } from '@mui/material'
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -17,6 +17,59 @@ function FavoritesPage() {
   const [items, setItems] = useState(() => readFavorites())
   const { formatPrice } = useLanguage()
   const navigate = useNavigate()
+
+  // Seed with mock data when empty
+  useEffect(() => {
+    if (!items || items.length === 0) {
+      const seed = [
+        {
+          flight_id: 9991,
+          airline_name: 'LOT Polish Airlines',
+          airline_code: 'LO',
+          departure_time: new Date().toISOString(),
+          arrival_time: new Date(Date.now() + 3.5*3600*1000).toISOString(),
+          departure_city: 'Краків',
+          arrival_city: 'Мадрид',
+          departure_airport_name: 'Kraków John Paul II Intl',
+          arrival_airport_name: 'Adolfo Suárez Madrid–Barajas',
+          departure_airport_code: 'KRK',
+          arrival_airport_code: 'MAD',
+          min_price: 129.0,
+        },
+        {
+          flight_id: 9992,
+          airline_name: 'Ryanair',
+          airline_code: 'FR',
+          departure_time: new Date().toISOString(),
+          arrival_time: new Date(Date.now() + 2.8*3600*1000).toISOString(),
+          departure_city: 'Варшава',
+          arrival_city: 'Рим',
+          departure_airport_name: 'Warsaw Modlin',
+          arrival_airport_name: 'Rome Ciampino',
+          departure_airport_code: 'WMI',
+          arrival_airport_code: 'CIA',
+          min_price: 79.0,
+        },
+        {
+          flight_id: 9993,
+          airline_name: 'Iberia',
+          airline_code: 'IB',
+          departure_time: new Date().toISOString(),
+          arrival_time: new Date(Date.now() + 4.1*3600*1000).toISOString(),
+          departure_city: 'Барселона',
+          arrival_city: 'Берлін',
+          departure_airport_name: 'Barcelona–El Prat',
+          arrival_airport_name: 'Berlin Brandenburg',
+          departure_airport_code: 'BCN',
+          arrival_airport_code: 'BER',
+          min_price: 145.0,
+        },
+      ]
+      setItems(seed)
+      writeFavorites(seed)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const remove = (id) => {
     const next = items.filter(i => i.flight_id !== id)

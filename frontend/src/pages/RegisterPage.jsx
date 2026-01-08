@@ -33,13 +33,18 @@ const RegisterPage = () => {
     e.preventDefault()
     setError('')
 
+    if (!formData.first_name.trim() || !formData.last_name.trim()) {
+      setError('Будь ласка, введіть імʼя та прізвище')
+      return
+    }
+
     if (formData.password !== formData.password_confirm) {
-      setError('Passwords do not match')
+      setError('Паролі не співпадають')
       return
     }
 
     if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters')
+      setError('Пароль має містити щонайменше 8 символів')
       return
     }
 
@@ -69,7 +74,7 @@ const RegisterPage = () => {
     >
       <Paper elevation={3} sx={{ p: 4, maxWidth: 400, width: '100%' }}>
         <Typography variant="h4" gutterBottom fontWeight="bold" align="center">
-          Register
+          Реєстрація
         </Typography>
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -79,7 +84,7 @@ const RegisterPage = () => {
         <form onSubmit={handleSubmit}>
           <TextField
             fullWidth
-            label="First Name"
+            label="Імʼя"
             name="first_name"
             value={formData.first_name}
             onChange={handleChange}
@@ -88,7 +93,7 @@ const RegisterPage = () => {
           />
           <TextField
             fullWidth
-            label="Last Name"
+            label="Прізвище"
             name="last_name"
             value={formData.last_name}
             onChange={handleChange}
@@ -97,7 +102,7 @@ const RegisterPage = () => {
           />
           <TextField
             fullWidth
-            label="Username"
+            label="Імʼя користувача"
             name="username"
             value={formData.username}
             onChange={handleChange}
@@ -118,7 +123,7 @@ const RegisterPage = () => {
           />
           <TextField
             fullWidth
-            label="Password"
+            label="Пароль"
             name="password"
             type="password"
             value={formData.password}
@@ -129,7 +134,7 @@ const RegisterPage = () => {
           />
           <TextField
             fullWidth
-            label="Confirm Password"
+            label="Підтвердження паролю"
             name="password_confirm"
             type="password"
             value={formData.password_confirm}
@@ -150,16 +155,16 @@ const RegisterPage = () => {
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             }}
           >
-            {loading ? 'Registering...' : 'Register'}
+            {loading ? 'Реєструємо…' : 'Зареєструватись'}
           </Button>
           <Typography variant="body2" align="center">
-            Already have an account?{' '}
+            Вже маєте акаунт?{' '}
             <Link
               component="button"
               variant="body2"
               onClick={() => navigate('/login')}
             >
-              Login here
+              Увійти
             </Link>
           </Typography>
         </form>

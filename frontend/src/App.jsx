@@ -9,6 +9,7 @@ import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import ChatPage from './pages/ChatPage'
 import HotelsPage from './pages/HotelsPage'
+import HotelDetailsPage from './pages/HotelDetailsPage'
 import FavoritesPage from './pages/FavoritesPage'
 import ProfilePage from './pages/ProfilePage'
 import MyFlightsPage from './pages/MyFlightsPage'
@@ -30,6 +31,7 @@ function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/chat" element={<ChatPage />} />
             <Route path="/hotels" element={<HotelsPage />} />
+            <Route path="/hotels/:id" element={<HotelDetailsPage />} />
             <Route path="/favorites" element={<FavoritesPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/my-flights" element={<MyFlightsPage />} />

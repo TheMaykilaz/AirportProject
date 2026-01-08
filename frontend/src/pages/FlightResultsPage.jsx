@@ -533,21 +533,7 @@ const FlightResultsPage = () => {
           </aside>
 
           <div className="results-area">
-            {flights.length > 0 && (
-              <div className="fare-summary">
-                <h3>Cheapest fare with baggage</h3>
-                <div className="fare-features">
-                  <span>Hand luggage 1x5 kg</span>
-                  <span>Baggage 1x23 kg</span>
-                  <span>No exchange</span>
-                  <span>No refund</span>
-                </div>
-                <div className="fare-more">
-                  <span>If other conditions are needed, suitable fares will be found</span>
-                  <span>→</span>
-                </div>
-              </div>
-            )}
+            {/* Fare summary removed as per request */}
 
             {flights.length > 0 && (
               <div className="flight-section">

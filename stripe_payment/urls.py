@@ -7,7 +7,8 @@ from .views import (
     test_webhook,
     StripeTestPageView,
     PaymentSuccessView,
-    PaymentCancelView
+    PaymentCancelView,
+    create_hotel_checkout_session,
 )
 
 router = DefaultRouter()
@@ -21,4 +22,5 @@ urlpatterns = [
     path('test/', StripeTestPageView.as_view(), name='stripe-test-page'),
     path('success/', PaymentSuccessView.as_view(), name='payment-success'),
     path('cancel/', PaymentCancelView.as_view(), name='payment-cancel'),
+    path('hotel-checkout/', create_hotel_checkout_session, name='hotel-checkout'),
 ]
