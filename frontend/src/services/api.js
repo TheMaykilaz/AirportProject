@@ -108,8 +108,8 @@ export const bookingAPI = {
 
 // Payment API
 export const paymentAPI = {
-  createCheckoutSession: (orderId) =>
-    api.post('/payments/payments/create_checkout_session/', { order: orderId }),
+  createCheckoutSession: (orderId, surchargeUSD) =>
+    api.post('/payments/payments/create_checkout_session/', { order: orderId, surcharge: surchargeUSD }),
 }
 
 // Airport/Airline API

@@ -116,6 +116,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
     def create_checkout_session(self, request):
         """Create a Stripe Checkout Session for hosted payment page"""
         order_id = request.data.get("order")
+        surcharge = request.data.get("surcharge")  # optional extra (in USD)
         if not order_id:
             return Response({"error": "order is required"}, status=status.HTTP_400_BAD_REQUEST)
         
@@ -130,6 +131,17 @@ class PaymentViewSet(viewsets.ModelViewSet):
             # Update amount if payment already exists
             payment.amount = order.total_price
             payment.save()
+        
+        # Apply optional surcharge (e.g., baggage, exchange, etc.)
+        try:
+            if surcharge is not None:
+                extra = Decimal(str(surcharge))
+                if extra < 0:
+                    return Response({"error": "surcharge must be >= 0"}, status=status.HTTP_400_BAD_REQUEST)
+                payment.amount = (Decimal(payment.amount) + extra).quantize(Decimal('0.01'))
+                payment.save(update_fields=["amount"])
+        except Exception:
+            return Response({"error": "invalid surcharge"}, status=status.HTTP_400_BAD_REQUEST)
         
         # Get the domain from the request
         domain = request.build_absolute_uri('/')[:-1]  # Remove trailing slash
@@ -146,7 +158,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                             'name': f'Flight Order #{order.id}',
                             'description': f'Payment for flight booking',
                         },
-                        'unit_amount': int(payment.amount * 100),  # Convert to cents
+                        'unit_amount': int(Decimal(payment.amount) * 100),  # Convert to cents
                     },
                     'quantity': 1,
                 }],

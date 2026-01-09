@@ -214,8 +214,16 @@ const BookingPage = () => {
           seat_numbers: seatNumbers,
       })
 
+      // Calculate surcharge for selected extra services (USD)
+      const passengerCount = passengers.length
+      let surchargeUSD = 0
+      if (ticketExchange) surchargeUSD += (2159 / 42) * passengerCount
+      if (checkedBaggage) surchargeUSD += (3484 / 42) * passengerCount
+      if (baggageProtection) surchargeUSD += (362 / 42) * passengerCount
+
       const paymentResponse = await paymentAPI.createCheckoutSession(
-        bookingResponse.data.order_id
+        bookingResponse.data.order_id,
+        Number(surchargeUSD.toFixed(2))
       )
 
       if (paymentResponse.data.checkout_url) {
@@ -246,34 +254,16 @@ const BookingPage = () => {
     }
   }
 
-  // Calculate total price (all prices in USD, then convert to selected currency)
+  // Calculate total price in USD; displayPrice() will convert to chosen currency
   const calculateTotalPrice = () => {
     if (!flight) return 0
-    
-    // Base price is in USD (350 USD)
     const basePriceUSD = parseFloat(flight.min_price || 0)
     const passengerCount = passengers.length
-    
     let totalUSD = basePriceUSD * passengerCount
-    
-    // Additional services prices in UAH, convert to USD first
-    // Ticket exchange: 2159 UAH = 2159/42 = 51.4 USD per passenger
-    if (ticketExchange) {
-      totalUSD += (2159 / 42) * passengerCount
-    }
-    
-    // Checked baggage: 3484 UAH = 3484/42 = 82.95 USD per passenger
-    if (checkedBaggage) {
-      totalUSD += (3484 / 42) * passengerCount
-    }
-    
-    // Baggage protection: 362 UAH = 362/42 = 8.62 USD per passenger
-    if (baggageProtection) {
-      totalUSD += (362 / 42) * passengerCount
-    }
-    
-    // Convert to selected currency
-    return convertPrice(totalUSD, 'USD')
+    if (ticketExchange) totalUSD += (2159 / 42) * passengerCount
+    if (checkedBaggage) totalUSD += (3484 / 42) * passengerCount
+    if (baggageProtection) totalUSD += (362 / 42) * passengerCount
+    return totalUSD
   }
   
   // Format price for display (priceUSD is already in USD)

@@ -1,240 +1,195 @@
-# Airport Project - Django REST API
+# DavaiPoihalu — система бронювання авіаквитків та готелів
 
-A comprehensive flight booking system with Stripe payment integration, Google OAuth, and email verification.
+Повнофункціональний веб-застосунок з пошуком рейсів, бронюванням місць, оплатою через Stripe, модулем готелів, AI-чатом довідки та українською локалізацією.
 
-## Features
+## Основні можливості
 
-- ✈️ Flight management (airports, airlines, airplanes, routes, flights)
-- 🎫 Ticket booking with seat selection
-- 💳 Stripe Checkout integration for payments
-- 🔐 JWT authentication + Google OAuth
-- 📧 Email verification
-- 📚 Interactive API documentation (Swagger/ReDoc)
-- 🐳 Docker containerization
+- ✈️ Пошук і відображення рейсів (аеропорти, авіалінії, літаки, рейси)
+- 🪑 Вибір місць і створення замовлення (квитки генеруються з цінами за місце)
+- 💳 Оплата через Stripe Checkout із урахуванням додаткових послуг (surcharge)
+- 🏨 Каталог готелів біля аеропортів, деталі готелю, бронювання й оплата (ендпоінт для готелів)
+- 👤 Реєстрація/логін (JWT), оновлення профілю
+- 🌐 Українська локалізація інтерфейсу та цін (переклад, конвертація валют лише на рівні відображення)
+- 🤖 AI-чат довідки на базі Django view (без CSRF), готовий до інтеграції у React
+- 📚 Swagger/ReDoc документація API
 
-## Quick Start with Docker
+## Архітектура
 
-### Prerequisites
-- Docker Desktop installed
-- Docker Compose installed
+- Backend: Django + DRF, додатки `airport`, `bookings`, `stripe_payment`, `hotels`, `ai_chat`, `user`.
+- Frontend: React (Vite), Material UI, контекст мови/валюти, маршрути `/search`, `/results`, `/booking/:flightId`, `/hotels`, `/hotels/:id`, `/dashboard` тощо.
+- Платежі: Stripe Checkout Sessions. Для рейсів — через `PaymentViewSet.create_checkout_session`; для готелів — `create_hotel_checkout_session`.
 
-### 1. Clone and setup
+## Швидкий старт (локально)
+
+1) Встановлення залежностей
 ```bash
-cd AirportProject
+pip install -r requirements.txt
 ```
 
-### 2. Configure environment (optional)
-If you want to use Stripe or Google OAuth, copy `.env.docker` to `.env` and add your keys:
+2) Міграції та створення суперкористувача
 ```bash
-cp .env.docker .env
-# Edit .env with your actual Stripe keys
+python manage.py migrate
+python manage.py createsuperuser
 ```
 
-### 3. Start the application
+3) Запустити сервер Django
+```bash
+python manage.py runserver
+```
+
+4) Запустити фронтенд (у папці `frontend`)
+```bash
+npm install
+npm run dev
+```
+
+5) Документація та адмінка
+- Swagger: http://localhost:8000/swagger/
+- ReDoc: http://localhost:8000/redoc/
+- Admin: http://localhost:8000/admin/
+
+## Дані та наповнення бази
+
+- Базові приклади рейсів: `python manage.py populate_sample_data`
+- Європейські аеропорти з українськими назвами міст: `python manage.py populate_europe_ua`
+- Готелі Європи з українськими назвами та номерами: `python manage.py populate_hotels_europe_ua`
+
+Результат: у базі будуть країни/аеропорти (KRK — Краків, WAW — Варшава, PRG — Прага, VIE — Відень тощо) та готелі, пов’язані з найближчими аеропортами, з номерами та цінами за ніч.
+
+## Ключові ендпоінти API
+
+- Аутентифікація
+  - `POST /api/token/` — отримати JWT
+  - `POST /api/token/refresh/` — оновити JWT
+  - `POST /api/users/register/` — реєстрація
+  - `GET /api/users/users/me/` — поточний користувач
+
+- Аеропорти/рейси
+  - `GET /api/airport/airports/`, `countries/`, `airlines/`, `airplanes/`
+  - `GET /api/airport/flights/` — пошук/список рейсів
+  - `GET /api/airport/flights/{id}/` — деталі рейсу
+  - `GET /api/airport/flights/{id}/seat_map/` — мапа місць
+
+- Бронювання (рейси)
+  - `POST /api/airport/orders/create_with_tickets/` — створити замовлення з квитками
+  - `POST /api/airport/orders/{id}/confirm/` — підтвердити після успішної оплати
+  - `POST /api/airport/orders/{id}/cancel/` — скасувати
+
+- Платежі (Stripe)
+  - `POST /api/payments/payments/create_checkout_session/` — створити Checkout Session для замовлення рейсу; параметр `surcharge` (USD) додає вартість додаткових послуг
+  - `POST /api/payments/hotel-checkout/` — створити Checkout Session для готелю (передаються ночі/харчування)
+  - `POST /api/payments/webhook/` — Stripe вебхук
+
+- Готелі
+  - `GET /api/hotels/` — список готелів
+  - `GET /api/hotels/{id}/` — деталі готелю (мін. ціна за ніч, зображення, зручності)
+
+## Логіка цін і валюти
+
+- Ціни зберігаються та передаються до Stripe у USD.
+- На фронтенді відображення конвертується у вибрану валюту лише для UI (без подвійної конвертації в розрахунках).
+- Для рейсів додаткові послуги (обмін квитка, багаж, страхування багажу) формують `surcharge` (USD), який ми передаємо в `create_checkout_session`.
+
+## Потік бронювання рейсу (Frontend → Backend → Stripe)
+
+1) Користувач обирає рейс і місця → створюється замовлення (`orders/create_with_tickets/`).
+2) Фронтенд рахує підсумок у USD, виділяє `surcharge` за додаткові послуги.
+3) Викликається `payments/create_checkout_session` з `order_id` та `surcharge` → отримуємо `checkout_url` Stripe.
+4) Оплата на Stripe → вебхук позначає платіж як успішний → замовлення підтверджується.
+
+## Потік бронювання готелю
+
+1) На сторінці готелю обираються параметри (кількість ночей, тип харчування), рахується підсумок.
+2) Виклик `payments/hotel-checkout/` створює Stripe Checkout Session на суму за весь період.
+3) Після успіху (додатково) можна створити запис `HotelBooking` та зв’язати з платежем.
+
+## Запуск у Docker
+
 ```bash
 docker-compose up --build
 ```
+Запустить: бекенд (http://localhost:8000), БД, застосувати міграції, створити адміністратора і підняти документацію.
 
-This single command will:
-- ✅ Build the Docker image
-- ✅ Start PostgreSQL database
-- ✅ Run database migrations
-- ✅ Create a superuser (admin@airport.com / admin123)
-- ✅ Start the Django server on http://localhost:8000
-
-### 4. Access the application
-
-- **API Documentation (Swagger)**: http://localhost:8000/swagger/
-- **API Documentation (ReDoc)**: http://localhost:8000/redoc/
-- **Admin Panel**: http://localhost:8000/admin/
-  - Email: `admin@airport.com`
-  - Password: `admin123`
-
-## API Endpoints
-
-### Authentication
-- `POST /api/token/` - Get JWT access token
-- `POST /api/token/refresh/` - Refresh JWT token
-- `POST /api/users/register/` - Register new user
-- `GET /api/users/me/` - Get current user profile
-
-### Airport Management
-- `GET /api/airport/countries/` - List countries
-- `GET /api/airport/airports/` - List airports
-- `GET /api/airport/airlines/` - List airlines
-- `GET /api/airport/airplanes/` - List airplanes
-- `GET /api/airport/flights/` - List flights
-
-### Booking
-- `POST /api/airport/test-order/create_order/` - Create order with tickets
-- `GET /api/airport/orders/` - List user orders
-- `GET /api/airport/tickets/` - List user tickets
-
-### Payments
-- `POST /api/payments/payments/create_checkout_session/` - Create Stripe Checkout session
-- `POST /api/payments/webhook/` - Stripe webhook endpoint
-
-## Testing the Full Flow
-
-### 1. Get Authentication Token
+Корисні команди:
 ```bash
-curl -X POST http://localhost:8000/api/token/ \
-  -H "Content-Type: application/json" \
-  -d '{"email": "admin@airport.com", "password": "admin123"}'
-```
-
-### 2. Create Test Data via Swagger
-1. Go to http://localhost:8000/swagger/
-2. Click **Authorize** and enter: `Bearer YOUR_TOKEN`
-3. Create in order:
-   - Country → Airport → Airline → Airplane → Flight
-
-### 3. Create Order and Book Tickets
-```bash
-curl -X POST http://localhost:8000/api/airport/test-order/create_order/ \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "flight_id": 1,
-    "seat_numbers": ["1A", "1B"]
-  }'
-```
-
-### 4. Create Checkout Session
-```bash
-curl -X POST http://localhost:8000/api/payments/payments/create_checkout_session/ \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"order": 1}'
-```
-
-### 5. Complete Payment
-- Open the `checkout_url` from the response
-- Use test card: `4242 4242 4242 4242`
-- Any future expiry, any CVC
-
-## Stripe Webhook Testing
-
-### Option 1: Using Stripe CLI (Recommended)
-```bash
-# Install Stripe CLI
-stripe login
-
-# Forward webhooks to Docker container
-stripe listen --forward-to http://localhost:8000/api/payments/webhook/
-
-# Copy the webhook secret (whsec_...) and add to .env
-# Restart: docker-compose restart web
-```
-
-### Option 2: Using ngrok
-```bash
-# Expose local server
-ngrok http 8000
-
-# Add the ngrok URL to Stripe Dashboard webhooks
-# https://your-ngrok-url.ngrok.io/api/payments/webhook/
-```
-
-## Docker Commands
-
-```bash
-# Start services
-docker-compose up
-
-# Start in background
-docker-compose up -d
-
-# Stop services
-docker-compose down
-
-# View logs
-docker-compose logs -f web
-
-# Rebuild after code changes
-docker-compose up --build
-
-# Run migrations
 docker-compose exec web python manage.py migrate
-
-# Create superuser manually
-docker-compose exec web python manage.py createsuperuser
-
-# Access Django shell
-docker-compose exec web python manage.py shell
-
-# Run tests
-docker-compose exec web python manage.py test
+docker-compose exec web python manage.py populate_sample_data
+docker-compose exec web python manage.py populate_europe_ua
+docker-compose exec web python manage.py populate_hotels_europe_ua
 ```
 
-## Project Structure
+## Налаштування Stripe
 
-```
-AirportProject/
-├── AirplaneDJ/          # Django project settings
-├── airport/             # Main app (flights, bookings)
-├── user/                # User authentication
-├── stripe_payment/      # Payment integration
-├── templates/           # HTML templates
-├── Dockerfile           # Docker image definition
-├── docker-compose.yml   # Multi-container setup
-├── entrypoint.sh        # Startup script
-├── requirements.txt     # Python dependencies
-└── manage.py            # Django management
-```
-
-## Environment Variables
-
-Key variables in `docker-compose.yml`:
-
-- `SECRET_KEY` - Django secret key
-- `DEBUG` - Debug mode (True/False)
-- `DB_*` - Database credentials
-- `STRIPE_*` - Stripe API keys
-- `GOOGLE_*` - Google OAuth credentials
-- `EMAIL_*` - Email configuration
-
-## Troubleshooting
-
-### Database connection issues
+- Додайте ключі `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY` у налаштування/змінні середовища.
+- Для локального тесту вебхуків:
 ```bash
-# Check if database is running
-docker-compose ps
-
-# Restart database
-docker-compose restart db
+stripe listen --forward-to http://localhost:8000/api/payments/webhook/
 ```
+Картка для тесту: `4242 4242 4242 4242` (будь-який майбутній термін та CVC).
 
-### Port already in use
-```bash
-# Change port in docker-compose.yml
-ports:
-  - "8001:8000"  # Use 8001 instead of 8000
-```
+## Корисні посилання
 
-### View container logs
-```bash
-docker-compose logs -f web
-docker-compose logs -f db
-```
+- Swagger: http://localhost:8000/swagger/
+- ReDoc: http://localhost:8000/redoc/
+- Admin: http://localhost:8000/admin/
 
-### Reset database
-```bash
-docker-compose down -v  # Remove volumes
-docker-compose up --build
-```
+## Експериментальна частина: як протестувати користувачу
 
-## Production Deployment
+- Обліковий запис
+  - Зареєструйтесь або увійдіть (розділ Профіль/Вхід).
+  - Перевірте, що в шапці відображається ваш стан входу.
 
-For production:
-1. Change `SECRET_KEY` to a secure random value
-2. Set `DEBUG=False`
-3. Update `ALLOWED_HOSTS` in settings.py
-4. Use strong database passwords
-5. Configure proper email backend
-6. Set up SSL/TLS certificates
-7. Use environment-specific `.env` file
+- Пошук і бронювання рейсу
+  - Перейдіть на `/search`, оберіть міста (укр. назви підтримуються) і дату.
+  - На сторінці результатів відкрийте деталі рейсу, натисніть «Бронювати».
+  - На сторінці бронювання виберіть місця, додаткові послуги (багаж, обмін, страхування) — підсумок у валюті інтерфейсу має відповідати сумі в Stripe після переходу.
+  - Натисніть «Оплатити» і завершіть оплату на Stripe тестовою карткою `4242 4242 4242 4242`.
 
-## License
+- Перевірка замовлення
+  - Після успішної оплати поверніться в «Кабінет/Замовлення» і перевірте статус.
 
-This project is for educational purposes.
+- Готелі
+  - Відкрийте `/hotels` та перейдіть до будь-якого готелю (наприклад, «Краків», «Прага»).
+  - Оберіть кількість ночей і тип харчування, натисніть оплату через Stripe, перевірте суму.
+
+- AI-чат
+  - Відкрийте сторінку чату (якщо увімкнено маршрут у фронтенді), напишіть запитання про використання сервісу.
+
+Порада: якщо списки порожні — запустіть команди наповнення з розділу «Дані та наповнення бази».
+
+## Експериментальна частина для розробника: як розгорнути проєкт
+
+- Локальний запуск (без Docker)
+  - Python: `pip install -r requirements.txt`, далі `python manage.py migrate`, `python manage.py runserver`.
+  - Frontend: у каталозі `frontend` виконайте `npm install` та `npm run dev`.
+  - Налаштуйте CORS/CSRF у `AirplaneDJ/settings.py` (localhost:5173 уже додано).
+
+- Змінні середовища
+  - STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY — ключі Stripe.
+  - JWT/Email/Google OAuth (за потреби) — у .env або Docker Compose.
+
+- Наповнення даними
+  - `python manage.py populate_sample_data`
+  - `python manage.py populate_europe_ua`
+  - `python manage.py populate_hotels_europe_ua`
+
+- Перевірка платежів
+  - Запустіть `stripe listen --forward-to http://localhost:8000/api/payments/webhook/` для вебхуків.
+  - Перевірте створення Checkout Session через фронтенд або POST-запит на відповідні ендпоінти.
+
+- Docker (опційно)
+  - `docker-compose up --build` — піднімає веб, БД, застосовує міграції та готує демо.
+
+- Тести
+  - `python manage.py test` — бекенд-тести.
+  - Для фронтенда додайте/запустіть тести згідно вибраного стеку (наприклад, Vitest/Jest).
+
+## Вирішення проблем
+
+- Порт зайнятий: змініть порт у `docker-compose.yml` або параметрах запуску.
+- Міграції: виконайте `python manage.py migrate`.
+- Порожні списки: запустіть команди наповнення, наведені вище.
+
+## Ліцензія
+
+Проєкт для навчальних цілей.
